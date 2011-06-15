@@ -1,0 +1,14 @@
+*proj.user
+*.ncb
+*.aps
+*.suo
+*.cache
+*.pdb
+*.obj
+*.pch
+*.pdb
+*.tlog
+intermed/
+*.exp
+*.ilk
+*.lib

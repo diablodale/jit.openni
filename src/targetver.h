@@ -18,21 +18,11 @@
     along with jit.openni.  If not, see <http://www.gnu.org/licenses/>.
 ****************************************************************************/
 
-jit.openni - a Max Jitter external for OpenNI middleware
-Shell of it was imspired by the jit.simple example from the MaxSDK and
-the MaxSDK documentation
+#pragma once
 
+// Including SDKDDKVer.h defines the highest available Windows platform.
 
-Initially written and tested using:
-- Windows 7 64-bit Service Pack 1
-- Microsoft Visual C++ 2010 Express Version 10.0.30319.1 RTMRel
-- Hotfix for Microsoft Visual C++ 2010 Express - ENU (KB2455033)   KB2455033
-- OpenNI 1.1.0.39 for Win32
-- PrimeSense NITE 1.3.1.4 for Win32
-- PrimeSense Sensor KinectMod 5.0.1.32 for Win32
-- Max/MSP/Jitter 5.1.8 for Windows
+// If you wish to build your application for a previous Windows platform, include WinSDKVer.h and
+// set the _WIN32_WINNT macro to the platform you wish to support before including SDKDDKVer.h.
 
-v0.1.0---------
-Initial functionality. Able to read in an XML configuration file and initialize
-the OpenNI system based on it. Includes debugging output which lists available
-resolutions, depths, etc.
+#include <SDKDDKVer.h>
