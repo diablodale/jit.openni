@@ -32,6 +32,16 @@ Initially written and tested using:
 - PrimeSense Sensor KinectMod 5.0.1.32 for Win32
 - Max/MSP/Jitter 5.1.8 for Windows
 
+Build notes-----------
+- You will need to change the build's include and library directories to match
+  the locations in the Max SDK and OpenNI SDK.
+
+v0.2.0---------
+Now supports updating generators when the object receives a bang. A good use of
+the current functionality is defining an image, depth, and recording generator.
+A sample XML config file is included. Sending bangs will then create a .ONI
+recording file.
+
 v0.1.0---------
 Initial functionality. Able to read in an XML configuration file and initialize
 the OpenNI system based on it. Includes debugging output which lists available

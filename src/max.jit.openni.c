@@ -24,28 +24,18 @@
 	 the MaxSDK documentation
 */
 
+
+//---------------------------------------------------------------------------
+// Includes
+//---------------------------------------------------------------------------
+
 #include "targetver.h"
-#include "ext.h"
-#include "ext_obex.h"
-#include "jit.common.h"
-#include "max.jit.mop.h"
+#include "jit.openni.h"
 
+//---------------------------------------------------------------------------
+// Code
+//---------------------------------------------------------------------------
 
-// Max object instance data
-// Note: most instance data is in the Jitter object which we will wrap
-typedef struct _max_jit_openni {
-	t_object	ob;
-	void		*obex;
-} t_max_jit_openni;
-
-
-// prototypes
-//BEGIN_USING_C_LINKAGE
-t_jit_err	jit_openni_init(void);
-void		*max_jit_openni_new(t_symbol *s, long argc, t_atom *argv);
-void		max_jit_openni_free(t_max_jit_openni *x);
-void		max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc, t_atom *argv);
-//END_USING_C_LINKAGE
 
 // globals
 static void	*max_jit_openni_class = NULL;
@@ -57,15 +47,30 @@ int main(void)
 {	
 	void *p, *q;
 	
-	jit_openni_init();	
+	// initialize the Jitter class by calling Jitter class's registration function
+	jit_openni_init();
+	
+	// create the Max wrapper class
 	setup((t_messlist**)&max_jit_openni_class, (method)max_jit_openni_new, (method)max_jit_openni_free, sizeof(t_max_jit_openni), 0, A_GIMME, 0);
-
+	
+	// specify a byte offset to keep additional OBEX information
 	p = max_jit_classex_setup(calcoffset(t_max_jit_openni, obex));
+	
+	// look up the Jitter class in the class registry
 	q = jit_class_findbyname(gensym("jit_openni"));    
-    max_jit_classex_mop_wrap(p, q, MAX_JIT_MOP_FLAGS_OWN_BANG|MAX_JIT_MOP_FLAGS_OWN_OUTPUTMATRIX|MAX_JIT_MOP_FLAGS_OWN_JIT_MATRIX); // attrs & methods for name, type, dim, planecount, bang, outputmatrix, etc
-    max_jit_classex_standard_wrap(p, q, 0);						// attrs & methods for getattributes, dumpout, maxjitclassaddmethods, etc
-    max_addmethod_usurp_low((method)max_jit_openni_XMLConfig_read, "read");
-	addmess((method)max_jit_mop_assist, "assist", A_CANT, 0);	// standard matrix-operator (mop) assist fn 
+    
+	// add default methods and attributes for MOP max wrapper class
+	max_jit_classex_mop_wrap(p, q, MAX_JIT_MOP_FLAGS_OWN_OUTPUTMATRIX|MAX_JIT_MOP_FLAGS_OWN_JIT_MATRIX); // attrs & methods for name, type, dim, planecount, bang, outputmatrix, etc
+
+	// wrap the Jitter class with the standard methods for Jitter objects, e.g. getattributes, dumpout, maxjitclassaddmethods, etc
+	max_jit_classex_standard_wrap(p, q, 0);
+
+    // add methods to the Max wrapper class
+	max_addmethod_usurp_low((method)max_jit_openni_outputmatrix, "outputmatrix");	
+	max_addmethod_usurp_low((method)max_jit_openni_XMLConfig_read, "read");
+
+	// add an inlet/outlet assistance method; in this case the default matrix-operator (mop) assist fn 
+	addmess((method)max_jit_mop_assist, "assist", A_CANT, 0);
 	return 0;
 }
 
@@ -82,11 +87,12 @@ void *max_jit_openni_new(t_symbol *s, long argc, t_atom *argv)
 	x = (t_max_jit_openni*)max_jit_obex_new(max_jit_openni_class, gensym("jit_openni"));
 	if (x)
 	{
-		o = jit_object_new(gensym("jit_openni"));
+		o = jit_object_new(gensym("jit_openni"));	// instantiate jit.openni jitter object
 		if (o)
 		{
-			max_jit_mop_setup_simple(x, o, argc, argv);			
-			max_jit_attr_args(x, argc, argv);
+			max_jit_mop_setup_simple(x, o, argc, argv);	// handle standard MOP max wrapper setup tasks
+			max_jit_attr_args(x, argc, argv); // process attribute arguments, like auto handling of @attribute's
+#ifdef _DEBUG
 			for (i = 0; i < argc; i++)
 			{
 				switch (atom_gettype(&(argv[i])))
@@ -104,6 +110,7 @@ void *max_jit_openni_new(t_symbol *s, long argc, t_atom *argv)
 						object_error((t_object *)x, "arg %ld: forbidden argument", i); 
 				}
 			}
+#endif
 		} 
 		else
 		{
@@ -119,7 +126,11 @@ void *max_jit_openni_new(t_symbol *s, long argc, t_atom *argv)
 void max_jit_openni_free(t_max_jit_openni *x)
 {
 	max_jit_mop_free(x);
+	
+	// lookup the internal Jitter object instance and free
 	jit_object_free(max_jit_obex_jitob_get(x));
+	
+	// free resources associated with the obex entry
 	max_jit_obex_free(x);
 }
 
@@ -127,13 +138,15 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 {
 	long i;
 	t_atom *ap;	
-	t_object *mypatcher;
-	t_symbol *mypatcherpath;
 	short filePathID;
 	long fileType = 'TEXT', outType;
 	char filename[MAX_FILENAME_CHARS];
 	char fullyQualifiedPathname[MAX_PATH_CHARS];
 	
+#ifdef _DEBUG
+	t_object *mypatcher;
+	t_symbol *mypatcherpath;
+
 	if (object_obex_lookup(x, gensym("#P"), &mypatcher) != MAX_ERR_NONE)
 		object_error((t_object*)x, "error getting patcher for jit.openni");
 	object_post((t_object*)x, "my patcher is at address %lx",mypatcher);
@@ -149,6 +162,7 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 		object_error((t_object*)x, "error getting filepath symbol for max.jit.openni");
 		return;
 	}
+#endif
 
 	if (argc == 0) // if no argument supplied, ask for file
 	{
@@ -177,9 +191,43 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 	//Load file
 	if (path_topathname(filePathID, filename, fullyQualifiedPathname) == 0)
 	{
-		object_post((t_object*)x, "now able to load file %s", fullyQualifiedPathname);
-		//jit_openni_init_from_xml(max_jit_obex_jitob_get(x), gensym(fullyQualifiedPathname));
+		LOG_DEBUG2("asking Jitter object to load file %s", fullyQualifiedPathname);
 		jit_object_method(max_jit_obex_jitob_get(x), gensym("init_from_xml"), gensym(fullyQualifiedPathname));
 	}
 
+}
+
+void max_jit_openni_outputmatrix(t_max_jit_openni *x)
+{
+	t_atom a;
+	long outputmode = max_jit_mop_getoutputmode(x);
+	void *mop = max_jit_obex_adornment_get(x,_jit_sym_jit_mop);
+	t_jit_err err;	
+	
+	LOG_DEBUG("starting custom outputmatrix");
+	if (outputmode && mop)
+	{ //always output unless output mode is none
+		if (outputmode==1)
+		{
+			LOG_DEBUG("about to call matrix_calc from custom outputmatrix");
+			if (err=(t_jit_err)jit_object_method(max_jit_obex_jitob_get(x), _jit_sym_matrix_calc,
+				jit_object_method(mop,_jit_sym_getinputlist),
+				jit_object_method(mop,_jit_sym_getoutputlist)))						
+			{
+				jit_error_code(x,err); 
+			}
+			else
+			{
+				LOG_DEBUG("successfully called matrix_calc from custom outputmatrix, about to call default outputmatrix");
+				max_jit_mop_outputmatrix(x);
+				LOG_DEBUG("called outputmatrix after successfully calling matrix_calc");
+			}
+		}
+		else
+		{
+			LOG_DEBUG("about to call default outputmatrix, didn't call matrix_calc");
+			max_jit_mop_outputmatrix(x);
+			LOG_DEBUG("called outputmatrix still didn't call matrix_calc");
+		}
+	}	
 }
