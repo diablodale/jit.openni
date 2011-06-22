@@ -23,7 +23,6 @@
     </Node>
     <Node type="Image" name="Image1" stopOnError="false">
       <Configuration>
-        <PixelFormat>RGB24</PixelFormat>
         <Mirror on="true"/>
       </Configuration>
     </Node>

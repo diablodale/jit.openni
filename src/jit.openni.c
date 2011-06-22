@@ -57,29 +57,30 @@ t_jit_err jit_openni_init(void)
 	mop = (t_jit_object*)jit_object_new(_jit_sym_jit_mop, 0, 2); // no matrix inputs, 2 matrix outputs (depth and image generator output) + default dumpout
 																 // TODO allow arbitrary generator(s) therefore output(s)
 
+	jit_mop_output_nolink(mop,2);
 	output = jit_object_method(mop,_jit_sym_getoutput,1);		// get and then set DEPTHmap plane, dimension, and type restrictions
 	jit_attr_setlong(output,_jit_sym_minplanecount,1);			// TODO support whatever dimensions/planes that a generator can do based on XML config
 	jit_attr_setlong(output,_jit_sym_maxplanecount,1);
 	jit_attr_setlong(output,_jit_sym_mindimcount,2);
 	jit_attr_setlong(output,_jit_sym_maxdimcount,2);
-	jit_atom_setlong(&a_arr[0], 640);
-	jit_atom_setlong(&a_arr[1], 480);
-	jit_object_method(output,_jit_sym_maxdim,2,a_arr);
-	jit_object_method(output,_jit_sym_mindim,2,a_arr);
+	//jit_atom_setlong(&a_arr[0], 640);
+	//jit_atom_setlong(&a_arr[1], 480);
+	//jit_object_method(output,_jit_sym_maxdim,2,a_arr);
+	//jit_object_method(output,_jit_sym_mindim,2,a_arr);
 	jit_atom_setsym(a_arr,_jit_sym_long);						// set to be the default (and only) type allowed
 	jit_object_method(output,_jit_sym_types,1,a_arr);
 
 	output = jit_object_method(mop,_jit_sym_getoutput,2);		// get and then set IMAGEmap plane, dimension, and type restrictions
-	jit_attr_setlong(output,_jit_sym_minplanecount,4);			// TODO support whatever dimensions/planes that a generator can do based on XML config
-	jit_attr_setlong(output,_jit_sym_maxplanecount,4);
+	//jit_attr_setlong(output,_jit_sym_minplanecount,1);		// TODO support whatever dimensions/planes that a generator can do based on XML config
+	//jit_attr_setlong(output,_jit_sym_maxplanecount,4);
 	jit_attr_setlong(output,_jit_sym_mindimcount,2);
 	jit_attr_setlong(output,_jit_sym_maxdimcount,2);
-	jit_atom_setlong(&a_arr[0], 640);
-	jit_atom_setlong(&a_arr[1], 480);
-	jit_object_method(output,_jit_sym_maxdim,2,a_arr);
-	jit_object_method(output,_jit_sym_mindim,2,a_arr);
-	jit_atom_setsym(a_arr,_jit_sym_char);						// set to be the default (and only) type allowed
-	jit_object_method(output,_jit_sym_types,1,a_arr);
+	//jit_atom_setlong(&a_arr[0], 640);
+	//jit_atom_setlong(&a_arr[1], 480);
+	//jit_object_method(output,_jit_sym_maxdim,2,a_arr);
+	//jit_object_method(output,_jit_sym_mindim,2,a_arr);
+	//jit_atom_setsym(a_arr,_jit_sym_char);						// set to be the default (and only) type allowed
+	//jit_object_method(output,_jit_sym_types,1,a_arr);
 	
 	jit_class_addadornment(s_jit_openni_class, mop);
 
@@ -136,7 +137,8 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 	//long in_savelock;
 	long out_savelock, out2_savelock;
 	//t_jit_matrix_info in_minfo;
-	t_jit_matrix_info tmp_minfo, out_minfo, out2_minfo;
+	//t_jit_matrix_info tmp_minfo
+	t_jit_matrix_info out_minfo, out2_minfo;
 	//char *in_bp
 	char *out_bp, *out2_bp;		// char* so can reference down to a single byte as needed
 	long i, dimcount, planecount, dim[JIT_MATRIX_MAX_DIMCOUNT];
@@ -144,17 +146,16 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 	void *out_matrix, *out2_matrix, *tmp_matrix=NULL;
 	XnStatus nRetVal = XN_STATUS_OK;
 	//XnDepthPixel* pDepthMap;
-	
+	XnUInt32 nMiddleIndex;
+
 	// get the zeroth index input and output from
 	// the corresponding input and output lists
 	//in_matrix = jit_object_method(inputs,_jit_sym_getindex,0);
 	out_matrix = jit_object_method(outputs,_jit_sym_getindex,0);
 	out2_matrix = jit_object_method(outputs,_jit_sym_getindex,1);
 	
-	// if the object and both input and output matrices
-	// are valid, then process, else return an error
-	//if (x && in_matrix && out_matrix)
-	if (x && out_matrix && out2_matrix)
+	// if the object and both input and output matrices, both generators are valid, then process else error
+	if (x && out_matrix && out2_matrix && (x->hDepth) && (x->hImage))	// TODO allow arbitrary generator(s)
 	{
 		// lock input and output matrices
 		//in_savelock = (long) jit_object_method(in_matrix,_jit_sym_lock,1);
@@ -166,30 +167,52 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 		jit_object_method(out_matrix,_jit_sym_getinfo,&out_minfo);
 		jit_object_method(out2_matrix,_jit_sym_getinfo,&out2_minfo);
 
-		/*
-		// setup the temp matrix and metadata to describe the depthmap TODO don't do this every time
-		jit_matrix_info_default(&tmp_minfo);
-		tmp_minfo.flags = JIT_MATRIX_DATA_REFERENCE|JIT_MATRIX_DATA_FLAGS_USE;
-		tmp_minfo.type = _jit_sym_char;
-		tmp_minfo.planecount = 1;
-		tmp_minfo.dimcount = 2;
-		tmp_minfo.dim[0] = 640;
-		tmp_minfo.dim[1] = 480;
-		tmp_minfo.dimstride[0] = 2;
-		tmp_minfo.dimstride[1] = 1280;
-		output = jit_object_method(mop,_jit_sym_getoutput,1); // this might be alternative to do above static assignments dynamically
-		max_jit_mop_restrict_info(x,p,&info); // this might be alternative to do above static assignments dynamically
-		tmp_matrix = jit_object_new(_jit_sym_jit_matrix,&tmp_minfo);
-		if (!tmp_matrix)
+		// setup the outputs to describe the depthmap TODO don't do this every time
+		out_minfo.dim[0] = x->pDepthMD->pMap->FullRes.X;
+		out_minfo.dim[1] = x->pDepthMD->pMap->FullRes.Y;
+		jit_object_method(out_matrix, _jit_sym_setinfo, &out_minfo);
+
+		// setup the outputs to describe the depthmap TODO don't do this every time
+		switch(x->pImageMD->pMap->PixelFormat)
 		{
-				err = JIT_ERR_OUT_OF_MEM;
+			case XN_PIXEL_FORMAT_RGB24:
+				LOG_DEBUG("XN_PIXEL_FORMAT_RGB24");
+				out2_minfo.type = _jit_sym_char;
+				out2_minfo.planecount = 4;
+				out2_minfo.dim[0] = x->pImageMD->pMap->FullRes.X;
+				out2_minfo.dim[1] = x->pImageMD->pMap->FullRes.Y;
+				jit_object_method(out2_matrix, _jit_sym_setinfo, &out2_minfo);
+				break;
+			case XN_PIXEL_FORMAT_YUV422:
+				LOG_DEBUG("XN_PIXEL_FORMAT_YUV422");
+				out2_minfo.type = _jit_sym_char;
+				out2_minfo.planecount = 4;
+				out2_minfo.dim[0] = x->pImageMD->pMap->FullRes.X / 2;	// trusting that X res will always be an even number
+				out2_minfo.dim[1] = x->pImageMD->pMap->FullRes.Y;
+				jit_object_method(out2_matrix, _jit_sym_setinfo, &out2_minfo);
+				break;
+			case XN_PIXEL_FORMAT_GRAYSCALE_8_BIT:
+				LOG_DEBUG("XN_PIXEL_FORMAT_GRAYSCALE_8_BIT");
+				out2_minfo.type = _jit_sym_char;
+				out2_minfo.planecount = 1;
+				out2_minfo.dim[0] = x->pImageMD->pMap->FullRes.X;
+				out2_minfo.dim[1] = x->pImageMD->pMap->FullRes.Y;
+				jit_object_method(out2_matrix, _jit_sym_setinfo, &out2_minfo);
+				break;
+			case XN_PIXEL_FORMAT_GRAYSCALE_16_BIT:
+				LOG_DEBUG("XN_PIXEL_FORMAT_GRAYSCALE_16_BIT");
+				out2_minfo.type = _jit_sym_long;
+				out2_minfo.planecount = 1;
+				out2_minfo.dim[0] = x->pImageMD->pMap->FullRes.X;
+				out2_minfo.dim[1] = x->pImageMD->pMap->FullRes.Y;
+				jit_object_method(out2_matrix, _jit_sym_setinfo, &out2_minfo);
+				break;
+			default:
+				LOG_ERROR("Unsupported imagemap pixel format");
+				err=JIT_ERR_MISMATCH_TYPE;
 				goto out;
 		}
-		jit_object_method(tmp_matrix,_jit_sym_getinfo,&tmp_minfo);
-		LOG_DEBUG2("tmp_matrix dimstride[0]=%d", tmp_minfo.dimstride[0]);
-		LOG_DEBUG2("tmp_matrix dimstride[1]=%d", tmp_minfo.dimstride[1]);
-		*/
-
+		
 		// get matrix data pointers
 		//jit_object_method(in_matrix,_jit_sym_getdata,&in_bp);
 		jit_object_method(out_matrix,_jit_sym_getdata,&out_bp);
@@ -241,35 +264,32 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 //	if (x->pDepthMD) object_post((t_object*)x, "DepthMD FPS=%lu X=%lu Y=%lu Z=%u", x->pDepthMD->pMap->nFPS, x->pDepthMD->pMap->FullRes.X, x->pDepthMD->pMap->FullRes.Y, x->pDepthMD->nZRes);
 //	if (x->pImageMD) object_post((t_object*)x, "ImageMD FPS=%lu X=%lu Y=%lu", x->pImageMD->pMap->nFPS, x->pImageMD->pMap->FullRes.X, x->pImageMD->pMap->FullRes.Y);
 
-		if ((x->hDepth) && (x->hImage))	// TODO allow arbitrary generator(s)
+		// Calculate index of middle pixel TODO don't keep calculating this every time
+		nMiddleIndex = x->pDepthMD->pMap->FullRes.X * (x->pDepthMD->pMap->FullRes.Y / 2)	// start of middle line
+								+ (x->pDepthMD->pMap->FullRes.X / 2);								// middle of this line
+		// Don't wait for new data, just update all generators with the newest already available
+		nRetVal = xnWaitNoneUpdateAll(x->pContext);
+		if (nRetVal != XN_STATUS_OK)
 		{
-			// Calculate index of middle pixel TODO don't keep calculating this every time
-			XnUInt32 nMiddleIndex = x->pDepthMD->pMap->FullRes.X * (x->pDepthMD->pMap->FullRes.Y / 2)	// start of middle line
-									+ (x->pDepthMD->pMap->FullRes.X / 2);								// middle of this line
-			// Don't wait for new data, just update all generators with the newest already available
-			nRetVal = xnWaitNoneUpdateAll(x->pContext);
-			if (nRetVal != XN_STATUS_OK)
-			{
-				LOG_ERROR2("Failed updating generator nodes", xnGetStatusString(nRetVal));
-			}
-			else
-			{
-				LOG_DEBUG("updated generator");
-				LOG_DEBUG2("Depth middle pixel mm=%u", x->pDepthMD->pData[nMiddleIndex]);
-				//pDepthMap = xnGetDepthMap(x->hDepth);
-				//LOG_DEBUG2("Depth middle pixel mm=%u", pDepthMap[nMiddleIndex]);
+			LOG_ERROR2("Failed updating generator nodes", xnGetStatusString(nRetVal));
+		}
+		else
+		{
+			LOG_DEBUG("updated generator");
+			LOG_DEBUG2("Depth middle pixel mm=%u", x->pDepthMD->pData[nMiddleIndex]);
+			//pDepthMap = xnGetDepthMap(x->hDepth);
+			//LOG_DEBUG2("Depth middle pixel mm=%u", pDepthMap[nMiddleIndex]);
 
-				// manually copy depth array to jitter matrix because depth array is 16-bit unsigned ints and jitter method don't directly support them
-				copyDepthDatatoJitterMatrix(x->pDepthMD, out_bp, &out_minfo);
-				// manually copy image array to jitter matrix because we may need to add alpha channel to matrix
-				copyImageDatatoJitterMatrix(x->pImageMD, out2_bp, &out2_minfo);
+			// manually copy depth array to jitter matrix because depth array is 16-bit unsigned ints and jitter method don't directly support them
+			copyDepthDatatoJitterMatrix(x->pDepthMD, out_bp, &out_minfo);
+			// manually copy image array to jitter matrix because we may need to add alpha channel to matrix
+			copyImageDatatoJitterMatrix(x->pImageMD, out2_bp, &out2_minfo);
 								
-				//err = (t_jit_err) jit_object_method(tmp_matrix,_jit_sym_data,x->pDepthMD->pData);
-				//if (err) goto out;
-				//err = (t_jit_err) jit_object_method(out_matrix,_jit_sym_frommatrix,tmp_matrix,NULL);
-				//if (err) goto out;
+			//err = (t_jit_err) jit_object_method(tmp_matrix,_jit_sym_data,x->pDepthMD->pData);
+			//if (err) goto out;
+			//err = (t_jit_err) jit_object_method(out_matrix,_jit_sym_frommatrix,tmp_matrix,NULL);
+			//if (err) goto out;
 
-			}
 		}
 	}
 	else
@@ -308,25 +328,40 @@ void copyImageDatatoJitterMatrix(XnImageMetaData *pImageMapMetaData, char *bpOut
 	
 	int i, j;
 	XnUInt8 *pImageMap = (XnUInt8 *)pImageMapMetaData->pData;
+	char *pCellData;
 	
 	for(i=0; i < pOutJitterMatrixInfo->dim[1]; i++) // for each row
 	{
+		pCellData = bpOutJitterMatrix + (i * pOutJitterMatrixInfo->dimstride[1]);
 		for(j=0; j < pOutJitterMatrixInfo->dim[0]; j++)  // go across each column
 		{
 			switch(pImageMapMetaData->pMap->PixelFormat)
 			{
 				case XN_PIXEL_FORMAT_RGB24:
-					bpOutJitterMatrix[0] = 0xFF;
-					bpOutJitterMatrix[1] = pImageMap[0];
-					bpOutJitterMatrix[2] = pImageMap[1];
-					bpOutJitterMatrix[3] = pImageMap[2];
-					bpOutJitterMatrix += 4;
+					pCellData[0] = 0xFF;
+					pCellData[1] = pImageMap[0];
+					pCellData[2] = pImageMap[1];
+					pCellData[3] = pImageMap[2];
+					pCellData += 4;
 					pImageMap += 3;
 					break;
-//				default:					// TODO should support more than RGB24 pixel format
+				case XN_PIXEL_FORMAT_YUV422:	// TODO can likely use jitter's 4-plane matrix copying function for this
+					pCellData[0] = pImageMap[0]; // U value for paired pixels
+					pCellData[1] = pImageMap[1]; // Y value for 1st pixel
+					pCellData[2] = pImageMap[2]; // V value for paired pixels
+					pCellData[3] = pImageMap[3]; // Y value for 2nd pixel
+					pCellData += 4;
+					pImageMap += 4;
+					break;
+				case XN_PIXEL_FORMAT_GRAYSCALE_8_BIT: // TODO can likely use jitter's 1-plane matrix copying function for this
+					*pCellData = *pImageMap;
+					pCellData++;
+					break;
+				case XN_PIXEL_FORMAT_GRAYSCALE_16_BIT:
+					*(long *)pCellData = *(XnUInt16 *)pImageMap;
+					pCellData += 2;
 			}
 		}
-		//bpOutJitterMatrix += pOutJitterMatrixInfo->dimstride[1];
 	}
 }
 
