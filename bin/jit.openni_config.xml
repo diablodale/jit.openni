@@ -16,20 +16,38 @@
 	</Log>
 	<ProductionNodes startGenerating="true">
 		<!--<Recording file="c:\input_file.oni" />-->
-		<Node type="Image" name="Image1" stopOnError="false">
-		  <Configuration>
-			<!--<MapOutputMode xRes="320" yRes="240" FPS="30"/>-->
-			<!--<PixelFormat>YUV422</PixelFormat>-->
-			<Mirror on="true"/>
-		  </Configuration>
-		</Node>
+    <!--<Node type="Image" name="Image1" stopOnError="false">
+      <Configuration>
+        <MapOutputMode xRes="1280" yRes="1024" FPS="15"/>
+        <Mirror on="true"/>
+      </Configuration>
+    </Node>-->
+    <Node type="Image" name="Image1" stopOnError="false">
+      <Configuration>
+        <Mirror on="true"/>
+      </Configuration>
+    </Node>
 		<Node type="Depth" name="Depth1">
 		  <Configuration>
 			<!--<AlternativeViewPoint>Image1</AlternativeViewPoint>-->
-			<Mirror on="true"/>
+			  <Mirror on="true"/>
 		  </Configuration>
 		</Node>
-	 <!-- codec names are defined in XnCodecIDs.h
+    <!-- IR is likely Grayscale 16-bit-->
+  <!--
+    <Node type="IR" name="Ir1">
+      <Configuration>
+        <Mirror on="true"/>
+      </Configuration>
+    </Node>
+    -->
+    <!--
+    <Node type="User" />
+    <Node type="Gesture" />
+    <Node type="Hands" />
+    <Node type="Scene" />
+    -->
+    <!-- codec names are defined in XnCodecIDs.h
 		<Node type="Recorder" name="Recorder1" stopOnError="false">
 		  <Configuration>
 			<RecorderDestination medium="File" name="./recorder.oni"/>

@@ -42,53 +42,15 @@
 #include "XnOpenNI.h"
 
 //---------------------------------------------------------------------------
-// typedefs
-//---------------------------------------------------------------------------
-
-// Max object instance data
-// Note: most instance data is in the Jitter object which we will wrap
-typedef struct _max_jit_openni {
-	t_object	ob;
-	void		*obex;
-} t_max_jit_openni;
-
-
-// Our Jitter object instance data
-typedef struct _jit_openni {
-	t_object	ob;
-	XnContext* pContext;
-	XnNodeHandle hDepth, hImage;
-	XnDepthMetaData* pDepthMD;
-	XnImageMetaData* pImageMD;
-} t_jit_openni;
-
-
-//---------------------------------------------------------------------------
-// Prototypes
-//---------------------------------------------------------------------------
-
-// jit.openni.c
-t_jit_err		jit_openni_init(void); 
-t_jit_openni	*jit_openni_new(void);
-void			jit_openni_free					(t_jit_openni *x);
-void			jit_openni_init_from_xml		(t_jit_openni *x, t_symbol *s); // TODO should this return a t_jit_err?
-t_jit_err		jit_openni_matrix_calc			(t_jit_openni *x, void *inputs, void *outputs);
-void			copy16BitDatatoJitterMatrix		(XnDepthMetaData *pMapMetaData, char *bpOutJitterMatrix, t_jit_matrix_info *pOutJitterMatrixInfo);
-void			copyImageDatatoJitterMatrix		(XnImageMetaData *pImageMapMetaData, char *bpOutJitterMatrix, t_jit_matrix_info *pOutJitterMatrixInfo);
-
-
-// max.jit.openni.c
-t_jit_err		jit_openni_init					(void);
-void			*max_jit_openni_new				(t_symbol *s, long argc, t_atom *argv);
-void			max_jit_openni_free				(t_max_jit_openni *x);
-void			max_jit_openni_XMLConfig_read	(t_max_jit_openni *x, t_symbol *s, short argc, t_atom *argv);
-void			max_jit_openni_outputmatrix		(t_max_jit_openni *x);
-
-//---------------------------------------------------------------------------
 // Macros
 //---------------------------------------------------------------------------
 
 #define JIT_OPENNI_VERSION "v0.3.0"
+#define NUM_OPENNI_GENERATORS 4
+#define DEPTH_GEN_INDEX 0
+#define IMAGE_GEN_INDEX 1
+#define USER_GEN_INDEX 2
+#define IR_GEN_INDEX 3
 
 #define copyDepthDatatoJitterMatrix(a, b, c) copy16BitDatatoJitterMatrix(a, b, c)
 #define MAKEULONGFROMCHARS(a, b, c, d) ((unsigned long)((unsigned long)a | ((unsigned long)b << 8) | ((unsigned long)c << 16) | ((unsigned long)d << 24)))
@@ -149,5 +111,49 @@ void			max_jit_openni_outputmatrix		(t_max_jit_openni *x);
 		object_error((t_object*)x, "%s (%s)", what, xnGetStatusString(rc));	\
 		return;																\
 	}
+
+//---------------------------------------------------------------------------
+// typedefs
+//---------------------------------------------------------------------------
+
+// Max object instance data
+// Note: most instance data is in the Jitter object which we will wrap
+typedef struct _max_jit_openni {
+	t_object	ob;
+	void		*obex;
+} t_max_jit_openni;
+
+
+// Our Jitter object instance data
+typedef struct _jit_openni {
+	t_object	ob;
+	XnContext* pContext;
+	XnNodeHandle hDepth, hImage;
+	XnDepthMetaData* pDepthMD;
+	XnImageMetaData* pImageMD;
+} t_jit_openni;
+
+
+//---------------------------------------------------------------------------
+// Prototypes
+//---------------------------------------------------------------------------
+
+// jit.openni.c
+t_jit_err		jit_openni_init(void); 
+t_jit_openni	*jit_openni_new(void);
+void			jit_openni_free					(t_jit_openni *x);
+void			jit_openni_init_from_xml		(t_jit_openni *x, t_symbol *s); // TODO should this return a t_jit_err?
+t_jit_err		jit_openni_matrix_calc			(t_jit_openni *x, void *inputs, void *outputs);
+void			copy16BitDatatoJitterMatrix		(XnDepthMetaData *pMapMetaData, char *bpOutJitterMatrix, t_jit_matrix_info *pOutJitterMatrixInfo);
+void			copyImageDatatoJitterMatrix		(XnImageMetaData *pImageMapMetaData, char *bpOutJitterMatrix, t_jit_matrix_info *pOutJitterMatrixInfo);
+
+
+// max.jit.openni.c
+t_jit_err		jit_openni_init					(void);
+void			*max_jit_openni_new				(t_symbol *s, long argc, t_atom *argv);
+void			max_jit_openni_free				(t_max_jit_openni *x);
+void			max_jit_openni_XMLConfig_read	(t_max_jit_openni *x, t_symbol *s, short argc, t_atom *argv);
+void			max_jit_openni_outputmatrix		(t_max_jit_openni *x);
+
 
 #endif

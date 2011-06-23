@@ -63,7 +63,7 @@ int main(void)
 	q = jit_class_findbyname(gensym("jit_openni"));    
     
 	// add default methods and attributes for MOP max wrapper class
-	max_jit_classex_mop_wrap(p, q, MAX_JIT_MOP_FLAGS_OWN_OUTPUTMATRIX|MAX_JIT_MOP_FLAGS_OWN_JIT_MATRIX); // attrs & methods for name, type, dim, planecount, bang, outputmatrix, etc
+	max_jit_classex_mop_wrap(p, q, MAX_JIT_MOP_FLAGS_OWN_OUTPUTMATRIX|MAX_JIT_MOP_FLAGS_OWN_JIT_MATRIX|MAX_JIT_MOP_FLAGS_OWN_ADAPT); // attrs & methods for name, type, dim, planecount, bang, outputmatrix, etc
 
 	// wrap the Jitter class with the standard methods for Jitter objects, e.g. getattributes, dumpout, maxjitclassaddmethods, etc
 	max_jit_classex_standard_wrap(p, q, 0);
@@ -221,16 +221,16 @@ void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 			}
 			else
 			{
-				LOG_DEBUG("successfully called matrix_calc from custom outputmatrix, about to call default outputmatrix");
+				LOG_DEBUG("called matrix_calc(), now calling outputmatrix()");
 				max_jit_mop_outputmatrix(x);
-				LOG_DEBUG("called outputmatrix after successfully calling matrix_calc");
+				LOG_DEBUG("called outputmatrix()");
 			}
 		}
-		else
+		else if (outputmode==3)
 		{
-			LOG_DEBUG("about to call default outputmatrix, didn't call matrix_calc");
+			LOG_DEBUG("bypassing matrix_calc(), now calling outputmatrix()");
 			max_jit_mop_outputmatrix(x);
-			LOG_DEBUG("called outputmatrix still didn't call matrix_calc");
+			LOG_DEBUG("called outputmatrix()");
 		}
 	}	
 }

@@ -54,21 +54,24 @@ t_jit_err jit_openni_init(void)
 	s_jit_openni_class = jit_class_new("jit_openni", (method)jit_openni_new, (method)jit_openni_free, sizeof(t_jit_openni), 0);
 
 	// add matrix operator (mop)
-	mop = (t_jit_object*)jit_object_new(_jit_sym_jit_mop, 0, 2); // no matrix inputs, 2 matrix outputs (depth and image generator output) + default dumpout
+	mop = (t_jit_object*)jit_object_new(_jit_sym_jit_mop, 0, NUM_OPENNI_GENERATORS); // no matrix inputs, matrix outputs (generator outputs) + default dumpout
 																 // TODO allow arbitrary generator(s) therefore output(s)
 
-	output = jit_object_method(mop,_jit_sym_getoutput,1);		// get and then set DEPTHmap plane, dimension, and type restrictions
-	jit_attr_setlong(output,_jit_sym_minplanecount,1);			// TODO support whatever dimensions/planes that a generator can do based on XML config
+	jit_mop_output_nolink(mop, DEPTH_GEN_INDEX + 1);				// setup the DEPTHmap
+	output = jit_object_method(mop, _jit_sym_getoutput, DEPTH_GEN_INDEX + 1);
+	jit_attr_setsym(output, _jit_sym_ioname, gensym("depthgen"));	// TODO unfortunately, this renames only 1 of the 4; remaining are dim, planecount, type
+	jit_attr_setlong(output,_jit_sym_minplanecount,1);
 	jit_attr_setlong(output,_jit_sym_maxplanecount,1);
 	jit_attr_setlong(output,_jit_sym_mindimcount,2);
 	jit_attr_setlong(output,_jit_sym_maxdimcount,2);
-	jit_atom_setsym(&a_arr[0], _jit_sym_long);
+	jit_atom_setsym(&a_arr[0], _jit_sym_long);						// set to be the default
 	jit_atom_setsym(&a_arr[1], _jit_sym_float32);
 	jit_atom_setsym(&a_arr[2], _jit_sym_float64);
 	jit_object_method(output,_jit_sym_types,3,a_arr);
 
-	jit_mop_output_nolink(mop,2);
-	output = jit_object_method(mop,_jit_sym_getoutput,2);		// get and then set IMAGEmap plane, dimension, and type restrictions
+	jit_mop_output_nolink(mop, IMAGE_GEN_INDEX + 1);				// setup the rgb camera IMAGEmap
+	output = jit_object_method(mop, _jit_sym_getoutput, IMAGE_GEN_INDEX + 1);
+	jit_attr_setsym(output, _jit_sym_ioname, gensym("imagegen"));
 	jit_attr_setlong(output,_jit_sym_minplanecount,1);
 	jit_attr_setlong(output,_jit_sym_maxplanecount,4);
 	jit_attr_setlong(output,_jit_sym_mindimcount,2);
@@ -77,10 +80,37 @@ t_jit_err jit_openni_init(void)
 	//jit_atom_setlong(&a_arr[1], 480);
 	//jit_object_method(output,_jit_sym_maxdim,2,a_arr);
 	//jit_object_method(output,_jit_sym_mindim,2,a_arr);
-	jit_atom_setsym(&a_arr[0], _jit_sym_char);						// set to be the default (and only) type allowed
+	jit_atom_setsym(&a_arr[0], _jit_sym_char);						// set to be the default
 	jit_atom_setsym(&a_arr[1], _jit_sym_long);
 	jit_object_method(output,_jit_sym_types,2,a_arr);
 	
+	jit_mop_output_nolink(mop, USER_GEN_INDEX + 1);					// setup the user generator (skeleton)
+	output = jit_object_method(mop,_jit_sym_getoutput, USER_GEN_INDEX + 1);
+	jit_attr_setsym(output, _jit_sym_ioname, gensym("usergen"));
+/*
+	jit_attr_setlong(output,_jit_sym_minplanecount,1);
+	jit_attr_setlong(output,_jit_sym_maxplanecount,4);
+	jit_attr_setlong(output,_jit_sym_mindimcount,2);
+	jit_attr_setlong(output,_jit_sym_maxdimcount,2);
+	//jit_atom_setlong(&a_arr[0], 640);
+	//jit_atom_setlong(&a_arr[1], 480);
+	//jit_object_method(output,_jit_sym_maxdim,2,a_arr);
+	//jit_object_method(output,_jit_sym_mindim,2,a_arr);
+	jit_atom_setsym(&a_arr[0], _jit_sym_char);					// set to be the default
+	jit_atom_setsym(&a_arr[1], _jit_sym_long);
+	jit_object_method(output,_jit_sym_types,2,a_arr);
+*/
+
+	jit_mop_output_nolink(mop, IR_GEN_INDEX + 1);				// setup the IR camera generator
+	output = jit_object_method(mop,_jit_sym_getoutput, IR_GEN_INDEX + 1);
+	jit_attr_setsym(output, _jit_sym_ioname, gensym("irgen"));
+	jit_attr_setlong(output,_jit_sym_minplanecount,1);
+	jit_attr_setlong(output,_jit_sym_maxplanecount,1);
+	jit_attr_setlong(output,_jit_sym_mindimcount,2);
+	jit_attr_setlong(output,_jit_sym_maxdimcount,2);
+	jit_atom_setsym(&a_arr[0], _jit_sym_long);					// set to be the default and only type allowed
+	jit_object_method(output,_jit_sym_types,1,a_arr);
+
 	jit_class_addadornment(s_jit_openni_class, mop);
 
 	// add method(s)
@@ -89,8 +119,6 @@ t_jit_err jit_openni_init(void)
 
 	// add attribute(s)
 	//	e.g. place back in decl section as needed: long attrflags = JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW;
-
-
 
 	// finalize class
 	jit_class_register(s_jit_openni_class);
@@ -130,108 +158,101 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 	// TODO parallelize this with a jit_openni_calculate_ndim
 
 	t_jit_err err=JIT_ERR_NONE;
-	//long in_savelock;
-	long out_savelock, out2_savelock;
-	//t_jit_matrix_info in_minfo;
-	//t_jit_matrix_info tmp_minfo
-	t_jit_matrix_info out_minfo, out2_minfo;
-	//char *in_bp
-	char *out_bp, *out2_bp;		// char* so can reference down to a single byte as needed
-	long i, dimcount, planecount, dim[JIT_MATRIX_MAX_DIMCOUNT];
-	//void *in_matrix;
-	void *out_matrix, *out2_matrix, *tmp_matrix=NULL;
+	long out_savelock[NUM_OPENNI_GENERATORS];
+	t_jit_matrix_info out_minfo[NUM_OPENNI_GENERATORS];
+	char *out_bp[NUM_OPENNI_GENERATORS];	// char* so can reference down to a single byte as needed
+	long i, j, dimcount;
+	void *out_matrix[NUM_OPENNI_GENERATORS];
+	boolean bGotOutMatrices = true;
 	XnStatus nRetVal = XN_STATUS_OK;
-	//XnDepthPixel* pDepthMap;
 	XnUInt32 nMiddleIndex;
 
 	// get the zeroth index input and output from
 	// the corresponding input and output lists
-	//in_matrix = jit_object_method(inputs,_jit_sym_getindex,0);
-	out_matrix = jit_object_method(outputs,_jit_sym_getindex,0);
-	out2_matrix = jit_object_method(outputs,_jit_sym_getindex,1);
-	
+	for (i=0;i<NUM_OPENNI_GENERATORS;i++)
+	{
+		if (!(out_matrix[i] = jit_object_method(outputs,_jit_sym_getindex,i)))
+		{
+			LOG_DEBUG2("could not get output [%d] matrix", i);
+			bGotOutMatrices = false;
+		}
+	}
+
 	// if the object and both input and output matrices, both generators are valid, then process else error
-	if (x && out_matrix && out2_matrix && (x->hDepth) && (x->hImage))	// TODO allow arbitrary generator(s)
+	if (x && bGotOutMatrices && (x->hDepth) && (x->hImage))	// TODO allow arbitrary generator(s)
 	{
 		// lock input and output matrices
-		//in_savelock = (long) jit_object_method(in_matrix,_jit_sym_lock,1);
-		out_savelock = (long) jit_object_method(out_matrix,_jit_sym_lock,1);
-		out2_savelock = (long) jit_object_method(out2_matrix,_jit_sym_lock,1);
+		for (i = 0; i< NUM_OPENNI_GENERATORS; i++)
+		{
+			out_savelock[i] = (long) jit_object_method(out_matrix[i],_jit_sym_lock,1);
+		}
 	
 		// fill out matrix info structs for input and output
-		//jit_object_method(in_matrix,_jit_sym_getinfo,&in_minfo);
-		jit_object_method(out_matrix,_jit_sym_getinfo,&out_minfo);
-		jit_object_method(out2_matrix,_jit_sym_getinfo,&out2_minfo);
+		for (i = 0; i< NUM_OPENNI_GENERATORS; i++)
+		{
+			jit_object_method(out_matrix[i],_jit_sym_getinfo,&out_minfo[i]);
+		}
 
-		// setup the outputs to describe the depthmap TODO don't do this every time
-		out_minfo.dim[0] = x->pDepthMD->pMap->FullRes.X;
-		out_minfo.dim[1] = x->pDepthMD->pMap->FullRes.Y;
-		jit_object_method(out_matrix, _jit_sym_setinfo, &out_minfo);
+		// setup the outputs to describe the depthmap TODO don't do this every time, only when it changes
+		out_minfo[DEPTH_GEN_INDEX].dim[0] = x->pDepthMD->pMap->FullRes.X;
+		out_minfo[DEPTH_GEN_INDEX].dim[1] = x->pDepthMD->pMap->FullRes.Y;
+		jit_object_method(out_matrix[DEPTH_GEN_INDEX], _jit_sym_setinfo, &out_minfo[DEPTH_GEN_INDEX]);
 
-		// setup the outputs to describe the imagemap TODO don't do this every time
+		// setup the outputs to describe the imagemap TODO don't do this every time, only when it changes
 		switch(x->pImageMD->pMap->PixelFormat)
 		{
 			case XN_PIXEL_FORMAT_RGB24:
 				LOG_DEBUG("XN_PIXEL_FORMAT_RGB24");
-				out2_minfo.type = _jit_sym_char;
-				out2_minfo.planecount = 4;
-				out2_minfo.dim[0] = x->pImageMD->pMap->FullRes.X;
-				out2_minfo.dim[1] = x->pImageMD->pMap->FullRes.Y;
+				out_minfo[IMAGE_GEN_INDEX].type = _jit_sym_char;
+				out_minfo[IMAGE_GEN_INDEX].planecount = 4;
+				out_minfo[IMAGE_GEN_INDEX].dim[0] = x->pImageMD->pMap->FullRes.X;
+				out_minfo[IMAGE_GEN_INDEX].dim[1] = x->pImageMD->pMap->FullRes.Y;
 				break;
 			case XN_PIXEL_FORMAT_YUV422:
 				LOG_DEBUG("XN_PIXEL_FORMAT_YUV422");
-				out2_minfo.type = _jit_sym_char;
-				out2_minfo.planecount = 4;
-				out2_minfo.dim[0] = x->pImageMD->pMap->FullRes.X / 2;	// trusting that X res will always be an even number
-				out2_minfo.dim[1] = x->pImageMD->pMap->FullRes.Y;
+				out_minfo[IMAGE_GEN_INDEX].type = _jit_sym_char;
+				out_minfo[IMAGE_GEN_INDEX].planecount = 4;
+				out_minfo[IMAGE_GEN_INDEX].dim[0] = x->pImageMD->pMap->FullRes.X / 2;	// trusting that X res will always be an even number
+				out_minfo[IMAGE_GEN_INDEX].dim[1] = x->pImageMD->pMap->FullRes.Y;
 				break;
 			case XN_PIXEL_FORMAT_GRAYSCALE_8_BIT:
 				LOG_DEBUG("XN_PIXEL_FORMAT_GRAYSCALE_8_BIT");
-				out2_minfo.type = _jit_sym_char;
-				out2_minfo.planecount = 1;
-				out2_minfo.dim[0] = x->pImageMD->pMap->FullRes.X;
-				out2_minfo.dim[1] = x->pImageMD->pMap->FullRes.Y;
+				out_minfo[IMAGE_GEN_INDEX].type = _jit_sym_char;
+				out_minfo[IMAGE_GEN_INDEX].planecount = 1;
+				out_minfo[IMAGE_GEN_INDEX].dim[0] = x->pImageMD->pMap->FullRes.X;
+				out_minfo[IMAGE_GEN_INDEX].dim[1] = x->pImageMD->pMap->FullRes.Y;
 				break;
 			case XN_PIXEL_FORMAT_GRAYSCALE_16_BIT:
 				LOG_DEBUG("XN_PIXEL_FORMAT_GRAYSCALE_16_BIT");
-				out2_minfo.type = _jit_sym_long;
-				out2_minfo.planecount = 1;
-				out2_minfo.dim[0] = x->pImageMD->pMap->FullRes.X;
-				out2_minfo.dim[1] = x->pImageMD->pMap->FullRes.Y;
+				out_minfo[IMAGE_GEN_INDEX].type = _jit_sym_long;
+				out_minfo[IMAGE_GEN_INDEX].planecount = 1;
+				out_minfo[IMAGE_GEN_INDEX].dim[0] = x->pImageMD->pMap->FullRes.X;
+				out_minfo[IMAGE_GEN_INDEX].dim[1] = x->pImageMD->pMap->FullRes.Y;
 				break;
 			default:
 				LOG_ERROR("Unsupported imagemap pixel format");
 				err=JIT_ERR_MISMATCH_TYPE;
 				goto out;
 		}
-		jit_object_method(out2_matrix, _jit_sym_setinfo, &out2_minfo);
+		jit_object_method(out_matrix[IMAGE_GEN_INDEX], _jit_sym_setinfo, &out_minfo[IMAGE_GEN_INDEX]);
 		
 		// get matrix data pointers
-		//jit_object_method(in_matrix,_jit_sym_getdata,&in_bp);
-		jit_object_method(out_matrix,_jit_sym_getdata,&out_bp);
-		jit_object_method(out2_matrix,_jit_sym_getdata,&out2_bp);
-		
-		// if data pointers are invalid, set error, and cleanup
-		//if (!in_bp) { err=JIT_ERR_INVALID_INPUT; goto out;}
-		if (!out_bp) { err=JIT_ERR_INVALID_OUTPUT; goto out;}
-		if (!out2_bp) { err=JIT_ERR_INVALID_OUTPUT; goto out;}
-		
-		// get dimensions/planecount
-		dimcount = out_minfo.dimcount;
-		planecount = out_minfo.planecount;
-		for (i=0;i<dimcount;i++)
+		for (i = 0; i< NUM_OPENNI_GENERATORS; i++)
 		{
-			//dim[i] = out_minfo.dim[i];
-			LOG_DEBUG3("out1 dimension[%d] size=%d", i, out_minfo.dim[i]);
-		}
-		dimcount = out2_minfo.dimcount;
-		planecount = out2_minfo.planecount;
-		for (i=0;i<dimcount;i++)
-		{
-			//dim[i] = out_minfo.dim[i];
-			LOG_DEBUG3("out2 dimension[%d] size=%d", i, out2_minfo.dim[i]);
-		}
+			jit_object_method(out_matrix[i],_jit_sym_getdata,&out_bp[i]);
+			if (!out_bp[i]) { err=JIT_ERR_INVALID_OUTPUT; goto out;} // if data pointers are invalid, set error, and cleanup
 
+#ifdef _DEBUG
+			// get dimensions/planecount
+			dimcount = out_minfo[i].dimcount;
+			for (j=0;j<dimcount;j++)
+			{
+				object_post((t_object*)x, "out%d dim[%d] = %d", i, j, out_minfo[i].dim[j]);
+			}
+			LOG_DEBUG3("out%d planes = %d", i, out_minfo[i].planecount);
+#endif
+		}
+		
 		// calculate, using the parallel utility function to
 		// call the calculate_ndim function in multiple
 		// threads if there are multiple processors available
@@ -239,6 +260,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 		//			dimcount, dim, planecount, &out_minfo, out_bp, 0 /* flags1 */);
 
 		// Don't wait for new data, just update all generators with the newest already available
+		// TODO adjust codebase to optionally allow no new matrices to be output for generators that have no new data
 		nRetVal = xnWaitNoneUpdateAll(x->pContext);
 		if (nRetVal != XN_STATUS_OK)
 		{
@@ -249,10 +271,10 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 			LOG_DEBUG("updated generator");
 
 			// manually copy depth array to jitter matrix because depth array is 16-bit unsigned ints and jitter method don't directly support them
-			copyDepthDatatoJitterMatrix(x->pDepthMD, out_bp, &out_minfo);
+			copyDepthDatatoJitterMatrix(x->pDepthMD, out_bp[DEPTH_GEN_INDEX], &out_minfo[DEPTH_GEN_INDEX]);
 
 			// manually copy image array to jitter matrix because we may need to add alpha channel to matrix
-			copyImageDatatoJitterMatrix(x->pImageMD, out2_bp, &out2_minfo);
+			copyImageDatatoJitterMatrix(x->pImageMD, out_bp[IMAGE_GEN_INDEX], &out_minfo[IMAGE_GEN_INDEX]);
 		}
 	}
 	else
@@ -261,9 +283,10 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 	}
 out:
 	// restore matrix lock state to previous value
-	jit_object_method(out_matrix,_jit_sym_lock,out_savelock);
-	jit_object_method(out2_matrix,_jit_sym_lock,out2_savelock);
-	//jit_object_method(in_matrix,_jit_sym_lock,in_savelock);
+	for (i = 0; i< NUM_OPENNI_GENERATORS; i++)
+	{
+		jit_object_method(out_matrix[i],_jit_sym_lock,out_savelock[i]);
+	}
 	return err;
 }
 
@@ -386,9 +409,9 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s) // TODO should this 
 	}
 #endif
 
-	if (!(x->hDepth) || !(x->hImage))	// TODO allow arbitrary generator(s)
+	if (!(x->hDepth || x->hImage))
 	{
-		LOG_ERROR("XMLconfig must have a DEPTH and IMAGE generator to function correctly");
+		LOG_ERROR("XMLconfig must have at least one generator (other than recorder) to function correctly");
 		return;
 	}
 

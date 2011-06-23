@@ -40,7 +40,8 @@ v0.3.0---------
 - now fully supports output of RGB and depth maps
 - added in a compiled Win32 binary Max Jitter external
 - depth maps can be output in long, float32, or float64
-- imagemap and depthmaps may work in many resolutions and formats, but it is untested
+- imagemap and depthmaps may work in many resolutions and formats, but is seldom tested in anything but 640x480.
+- All valid modes (resolutions, fps, etc.) reported from SensorKinect driver do not actually work. For example, only 640x480x30 works for depth.
 - when using SensorKinect driver, if you configure an alternate viewpoint in XML, the depthmap exhibits occasionally resizing
 
 v0.2.0---------
