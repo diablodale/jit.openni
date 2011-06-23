@@ -47,6 +47,9 @@ int main(void)
 {	
 	void *p, *q;
 	
+	post("jit.openni %s, Copyright (c) 2011 Dale Phurrough. This program comes with ABSOLUTELY NO WARRANTY.", JIT_OPENNI_VERSION);
+	post("jit.openni %s, Licensed under the GNU General Public License v3.0 (GPLv3) available at http://www.gnu.org/licenses/gpl-3.0.html", JIT_OPENNI_VERSION);
+
 	// initialize the Jitter class by calling Jitter class's registration function
 	jit_openni_init();
 	
@@ -98,23 +101,23 @@ void *max_jit_openni_new(t_symbol *s, long argc, t_atom *argv)
 				switch (atom_gettype(&(argv[i])))
 				{
 					case A_LONG:
-						object_post((t_object *)x, "arg %ld: long (%ld)", i, atom_getlong(&(argv[i])));
+						LOG_COMMENT3("arg %ld: long (%ld)", i, atom_getlong(&(argv[i])));
 						break;
 					case A_FLOAT:
-						object_post((t_object *)x, "arg %ld: float (%f)", i, atom_getfloat(&(argv[i])));
+						LOG_COMMENT3("arg %ld: float (%f)", i, atom_getfloat(&(argv[i])));
 						break;
 					case A_SYM:
-						object_post((t_object *)x, "arg %ld: symbol (%s)", i, atom_getsym(&(argv[i]))->s_name);
+						LOG_COMMENT3("arg %ld: symbol (%s)", i, atom_getsym(&(argv[i]))->s_name);
 						break;
 					default:
-						object_error((t_object *)x, "arg %ld: forbidden argument", i); 
+						LOG_WARNING2("arg %ld: forbidden argument", i); 
 				}
 			}
 #endif
 		} 
 		else
 		{
-			jit_object_error((t_object*)x, "jit.openni: could not allocate object");
+			LOG_ERROR("jit.openni: could not allocate object");
 			freeobject((t_object*)x);
 			x = NULL;
 		}
@@ -148,18 +151,18 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 	t_symbol *mypatcherpath;
 
 	if (object_obex_lookup(x, gensym("#P"), &mypatcher) != MAX_ERR_NONE)
-		object_error((t_object*)x, "error getting patcher for jit.openni");
-	object_post((t_object*)x, "my patcher is at address %lx",mypatcher);
+		LOG_ERROR("error getting patcher for jit.openni");
+	LOG_DEBUG2("my patcher is at address %lx",mypatcher);
 	mypatcherpath = object_attr_getsym(mypatcher, gensym("filepath"));
 	
 	// BUGBUG if I use _sym_nothing rather than gensym("") then I get linker error LNK2001: unresolved external symbol __common_symbols
 	if ((mypatcherpath) && (mypatcherpath != gensym("")))
 	{
-		object_post((t_object*)x, "The patcher path is %s", mypatcherpath->s_name);
+		LOG_COMMENT2("The patcher path is %s", mypatcherpath->s_name);
 	}
 	else
 	{
-		object_error((t_object*)x, "error getting filepath symbol for max.jit.openni");
+		LOG_COMMENT("error getting filepath symbol for max.jit.openni");
 		return;
 	}
 #endif
@@ -169,13 +172,13 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 		if (open_dialog(filename, &filePathID, &outType, &fileType, 1)) //BUGBUG
 		{
 			// non-zero: user cancelled or error
-			object_error((t_object*)x, "error getting XML config file from dialog box for max.jit.openni");
+			LOG_ERROR("error getting XML config file from dialog box for max.jit.openni");
 			return;
 		}
 	}
 	else if ((argc != 1) || (atom_gettype(argv) != A_SYM))
 	{
-		object_error((t_object*)x, "read must have only one symbol argument");
+		LOG_ERROR("read must have only one symbol argument");
 		return;
 	}
 	else // we have exactly one symbol argument
@@ -183,7 +186,7 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 		strncpy_zero(filename, atom_getsym(argv)->s_name, MAX_FILENAME_CHARS);
 		if (locatefile_extended(filename, &filePathID, &outType, &fileType, 1))
 		{
-			error("Could not find file %s",atom_getsym(argv)->s_name);
+			LOG_ERROR2("Could not find file", atom_getsym(argv)->s_name);
 			return;
 		}
 	}
