@@ -36,6 +36,13 @@ Build notes-----------
 - You will need to change the build's include and library directories to match
   the locations in the Max SDK and OpenNI SDK.
 
+v0.3.0---------
+- now fully supports output of RGB and depth maps
+- added in a compiled Win32 binary Max Jitter external
+- depth maps can be output in long, float32, or float64
+- imagemap and depthmaps may work in many resolutions and formats, but it is untested
+- when using SensorKinect driver, if you configure an alternate viewpoint in XML, the depthmap exhibits occasionally resizing
+
 v0.2.0---------
 Now supports updating generators when the object receives a bang. A good use of
 the current functionality is defining an image, depth, and recording generator.
