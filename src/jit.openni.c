@@ -32,7 +32,6 @@
 #include "targetver.h"
 #include "jit.openni.h"
 
-
 //---------------------------------------------------------------------------
 // Code
 //---------------------------------------------------------------------------
@@ -58,9 +57,8 @@ t_jit_err jit_openni_init(void)
 																 // TODO allow arbitrary generator(s) therefore output(s)
 
 #ifdef DEPTH_GEN_INDEX
-	jit_mop_output_nolink(mop, DEPTH_GEN_INDEX + 1);				// setup the DEPTHmap
+	//jit_mop_output_nolink(mop, DEPTH_GEN_INDEX + 1);				// if I nolink() then I can't change the attributes in the inspector
 	output = jit_object_method(mop, _jit_sym_getoutput, DEPTH_GEN_INDEX + 1);
-	jit_attr_setsym(output, _jit_sym_ioname, gensym("depthgen"));	// TODO unfortunately, this renames only 1 of the 4; remaining are dim, planecount, type
 	jit_attr_setlong(output,_jit_sym_minplanecount,1);
 	jit_attr_setlong(output,_jit_sym_maxplanecount,1);
 	jit_attr_setlong(output,_jit_sym_mindimcount,2);
@@ -72,9 +70,8 @@ t_jit_err jit_openni_init(void)
 #endif
 
 #ifdef IMAGE_GEN_INDEX
-	jit_mop_output_nolink(mop, IMAGE_GEN_INDEX + 1);				// setup the rgb camera IMAGEmap
+	//jit_mop_output_nolink(mop, IMAGE_GEN_INDEX + 1);				// if I nolink() then I can't change the attributes in the inspector
 	output = jit_object_method(mop, _jit_sym_getoutput, IMAGE_GEN_INDEX + 1);
-	jit_attr_setsym(output, _jit_sym_ioname, gensym("imagegen"));
 	jit_attr_setlong(output,_jit_sym_minplanecount,1);
 	jit_attr_setlong(output,_jit_sym_maxplanecount,4);
 	jit_attr_setlong(output,_jit_sym_mindimcount,2);
@@ -91,9 +88,8 @@ t_jit_err jit_openni_init(void)
 #endif
 
 #ifdef USER_GEN_INDEX
-	jit_mop_output_nolink(mop, USER_GEN_INDEX + 1);					// setup the user generator (skeleton)
+	//jit_mop_output_nolink(mop, USER_GEN_INDEX + 1);				// if I nolink() then I can't change the attributes in the inspector
 	output = jit_object_method(mop,_jit_sym_getoutput, USER_GEN_INDEX + 1);
-	jit_attr_setsym(output, _jit_sym_ioname, gensym("usergen"));
 /*
 	jit_attr_setlong(output,_jit_sym_minplanecount,1);
 	jit_attr_setlong(output,_jit_sym_maxplanecount,4);
@@ -110,9 +106,8 @@ t_jit_err jit_openni_init(void)
 #endif
 
 #ifdef IR_GEN_INDEX
-	jit_mop_output_nolink(mop, IR_GEN_INDEX + 1);				// setup the IR camera generator
+	//jit_mop_output_nolink(mop, IR_GEN_INDEX + 1);				// if I nolink() then I can't change the attributes in the inspector
 	output = jit_object_method(mop,_jit_sym_getoutput, IR_GEN_INDEX + 1);
-	jit_attr_setsym(output, _jit_sym_ioname, gensym("irgen"));
 	jit_attr_setlong(output,_jit_sym_minplanecount,1);
 	jit_attr_setlong(output,_jit_sym_maxplanecount,1);
 	jit_attr_setlong(output,_jit_sym_mindimcount,2);
@@ -227,54 +222,50 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 		{
 			LOG_DEBUG("updated generators");
 
+			// BUGBUG if I change the matrix type using the inspector while it is processing matrices, Max crashes
+			// BUGBUG this should instead look at productionNode and for the ones that are children of MapGenerators, do the following matrix resizing
+			// TODO don't do this every time, only when generators change
 			for (i = 0; i< NUM_OPENNI_GENERATORS; i++)
 			{
-
+				if (x->hProductionNode[i])
+				{
+					LOG_DEBUG3("generator[%d] pixelformat=%s", i, xnPixelFormatToString(((XnDepthMetaData *)x->pMapMetaData[i])->pMap->PixelFormat));
+					
+					// setup the outputs to support the map's PixelFormat
+					switch(((XnDepthMetaData *)x->pMapMetaData[i])->pMap->PixelFormat)
+					{
+						case XN_PIXEL_FORMAT_RGB24:
+							out_minfo[i].type = _jit_sym_char;
+							out_minfo[i].planecount = 4;
+							out_minfo[i].dim[0] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.X;
+							out_minfo[i].dim[1] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.Y;
+							break;
+						case XN_PIXEL_FORMAT_YUV422:
+							out_minfo[i].type = _jit_sym_char;
+							out_minfo[i].planecount = 4;
+							out_minfo[i].dim[0] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.X / 2;	// trusting that X res will always be an even number
+							out_minfo[i].dim[1] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.Y;
+							break;
+						case XN_PIXEL_FORMAT_GRAYSCALE_8_BIT:
+							out_minfo[i].type = _jit_sym_char;
+							out_minfo[i].planecount = 1;
+							out_minfo[i].dim[0] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.X;
+							out_minfo[i].dim[1] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.Y;
+							break;
+						case XN_PIXEL_FORMAT_GRAYSCALE_16_BIT:
+							out_minfo[i].planecount = 1;
+							out_minfo[i].dim[0] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.X;
+							out_minfo[i].dim[1] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.Y;
+							break;
+						default:
+							LOG_ERROR2("Unsupported PixelFormat", xnPixelFormatToString(((XnDepthMetaData *)x->pMapMetaData[i])->pMap->PixelFormat));
+							err=JIT_ERR_MISMATCH_TYPE;
+							goto out;
+					}
+					jit_object_method(out_matrix[i], _jit_sym_setinfo, &out_minfo[i]);
+				}
 			}
 
-			// setup the outputs to describe the depthmap TODO don't do this every time, only when it changes
-			out_minfo[DEPTH_GEN_INDEX].dim[0] = ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->FullRes.X;
-			out_minfo[DEPTH_GEN_INDEX].dim[1] = ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->FullRes.Y;
-			jit_object_method(out_matrix[DEPTH_GEN_INDEX], _jit_sym_setinfo, &out_minfo[DEPTH_GEN_INDEX]);
-
-			// setup the outputs to describe the imagemap TODO don't do this every time, only when it changes
-			switch(((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->PixelFormat)
-			{
-				case XN_PIXEL_FORMAT_RGB24:
-					LOG_DEBUG("XN_PIXEL_FORMAT_RGB24");
-					out_minfo[IMAGE_GEN_INDEX].type = _jit_sym_char;
-					out_minfo[IMAGE_GEN_INDEX].planecount = 4;
-					out_minfo[IMAGE_GEN_INDEX].dim[0] = ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->FullRes.X;
-					out_minfo[IMAGE_GEN_INDEX].dim[1] = ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->FullRes.Y;
-					break;
-				case XN_PIXEL_FORMAT_YUV422:
-					LOG_DEBUG("XN_PIXEL_FORMAT_YUV422");
-					out_minfo[IMAGE_GEN_INDEX].type = _jit_sym_char;
-					out_minfo[IMAGE_GEN_INDEX].planecount = 4;
-					out_minfo[IMAGE_GEN_INDEX].dim[0] = ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->FullRes.X / 2;	// trusting that X res will always be an even number
-					out_minfo[IMAGE_GEN_INDEX].dim[1] = ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->FullRes.Y;
-					break;
-				case XN_PIXEL_FORMAT_GRAYSCALE_8_BIT:
-					LOG_DEBUG("XN_PIXEL_FORMAT_GRAYSCALE_8_BIT");
-					out_minfo[IMAGE_GEN_INDEX].type = _jit_sym_char;
-					out_minfo[IMAGE_GEN_INDEX].planecount = 1;
-					out_minfo[IMAGE_GEN_INDEX].dim[0] = ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->FullRes.X;
-					out_minfo[IMAGE_GEN_INDEX].dim[1] = ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->FullRes.Y;
-					break;
-				case XN_PIXEL_FORMAT_GRAYSCALE_16_BIT:
-					LOG_DEBUG("XN_PIXEL_FORMAT_GRAYSCALE_16_BIT");
-					out_minfo[IMAGE_GEN_INDEX].type = _jit_sym_long;
-					out_minfo[IMAGE_GEN_INDEX].planecount = 1;
-					out_minfo[IMAGE_GEN_INDEX].dim[0] = ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->FullRes.X;
-					out_minfo[IMAGE_GEN_INDEX].dim[1] = ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->FullRes.Y;
-					break;
-				default:
-					LOG_ERROR("Unsupported imagemap pixel format");
-					err=JIT_ERR_MISMATCH_TYPE;
-					goto out;
-			}
-			jit_object_method(out_matrix[IMAGE_GEN_INDEX], _jit_sym_setinfo, &out_minfo[IMAGE_GEN_INDEX]);
-		
 			// get matrix data pointers
 			for (i = 0; i< NUM_OPENNI_GENERATORS; i++)
 			{
@@ -310,9 +301,9 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 			//{
 			//LOG_DEBUG("updated generator(s)");
 
+			// TODO change to iteration
 			// manually copy depth array to jitter matrix because depth array is 16-bit unsigned ints and jitter method don't directly support them
 			copyDepthDatatoJitterMatrix(((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX]), out_bp[DEPTH_GEN_INDEX], &out_minfo[DEPTH_GEN_INDEX]);
-
 			// manually copy image array to jitter matrix because we may need to add alpha channel to matrix
 			copyImageDatatoJitterMatrix(((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX]), out_bp[IMAGE_GEN_INDEX], &out_minfo[IMAGE_GEN_INDEX]);
 		}

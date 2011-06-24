@@ -145,7 +145,7 @@ void			jit_openni_init_from_xml		(t_jit_openni *x, t_symbol *s); // TODO should 
 t_jit_err		jit_openni_matrix_calc			(t_jit_openni *x, void *inputs, void *outputs);
 void			copy16BitDatatoJitterMatrix		(XnDepthMetaData *pMapMetaData, char *bpOutJitterMatrix, t_jit_matrix_info *pOutJitterMatrixInfo);
 void			copyImageDatatoJitterMatrix		(XnImageMetaData *pImageMapMetaData, char *bpOutJitterMatrix, t_jit_matrix_info *pOutJitterMatrixInfo);
-
+void			max_jit_openni_assist			(t_max_jit_openni *x, void *b, long io, long index, char *s);
 
 // max.jit.openni.c
 t_jit_err		jit_openni_init					(void);

@@ -64,7 +64,7 @@ int main(void)
     
 	// add default methods and attributes for MOP max wrapper class
 	max_jit_classex_mop_wrap(p, q, MAX_JIT_MOP_FLAGS_OWN_OUTPUTMATRIX|MAX_JIT_MOP_FLAGS_OWN_JIT_MATRIX|MAX_JIT_MOP_FLAGS_OWN_ADAPT); // attrs & methods for name, type, dim, planecount, bang, outputmatrix, etc
-
+	
 	// wrap the Jitter class with the standard methods for Jitter objects, e.g. getattributes, dumpout, maxjitclassaddmethods, etc
 	max_jit_classex_standard_wrap(p, q, 0);
 
@@ -73,7 +73,7 @@ int main(void)
 	max_addmethod_usurp_low((method)max_jit_openni_XMLConfig_read, "read");
 
 	// add an inlet/outlet assistance method; in this case the default matrix-operator (mop) assist fn 
-	addmess((method)max_jit_mop_assist, "assist", A_CANT, 0);
+	addmess((method)max_jit_openni_assist, "assist", A_CANT, 0);
 	return 0;
 }
 
@@ -136,6 +136,35 @@ void max_jit_openni_free(t_max_jit_openni *x)
 	// free resources associated with the obex entry
 	max_jit_obex_free(x);
 }
+
+
+void max_jit_openni_assist(t_max_jit_openni *x, void *b, long io, long index, char *s)
+{
+	int i;
+	t_jit_openni *pJit_OpenNI = max_jit_obex_jitob_get(x);
+
+	switch (io)
+	{
+		case 1:
+			strncpy_zero(s, "(text) read filename.xml only", 512);
+			break;
+		case 2:
+			if (index == NUM_OPENNI_GENERATORS)
+			{
+				strncpy_zero(s, "dumpout", 512);
+			}
+			else if (pJit_OpenNI->hProductionNode[index])
+			{
+				// TODO try to have the node type rather than the node name
+				snprintf_zero(s, 512, "(matrix) generator[%s]", xnGetNodeName(pJit_OpenNI->hProductionNode[index]));
+			}
+			else
+			{
+				snprintf_zero(s, 512, "(matrix) unloaded generator[%d]", index);
+			}
+	}
+}
+
 
 void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc, t_atom *argv)
 {
