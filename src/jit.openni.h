@@ -49,8 +49,8 @@
 #define NUM_OPENNI_GENERATORS 4
 #define DEPTH_GEN_INDEX 0
 #define IMAGE_GEN_INDEX 1
-#define USER_GEN_INDEX 2
-#define IR_GEN_INDEX 3
+#define IR_GEN_INDEX 2
+#define USER_GEN_INDEX 3
 
 #define copyDepthDatatoJitterMatrix(a, b, c) copy16BitDatatoJitterMatrix(a, b, c)
 #define MAKEULONGFROMCHARS(a, b, c, d) ((unsigned long)((unsigned long)a | ((unsigned long)b << 8) | ((unsigned long)c << 16) | ((unsigned long)d << 24)))
@@ -129,9 +129,10 @@ typedef struct _jit_openni {
 	t_object	ob;
 	XnContext* pContext;
 	XnNodeHandle hDepth, hImage, hUser, hIr;
-	XnDepthMetaData* pDepthMD;
-	XnImageMetaData* pImageMD;
-	XnIRMetaData* pIrMD;
+	XnMapMetaData *pMapMetaData[3];
+	//XnDepthMetaData* pDepthMD;
+	//XnImageMetaData* pImageMD;
+	//XnIRMetaData* pIrMD;
 	//XnSceneMetaData* pSceneMD;
 } t_jit_openni;
 

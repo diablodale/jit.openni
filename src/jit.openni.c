@@ -147,9 +147,12 @@ t_jit_openni *jit_openni_new(void)
 		}
 		else
 		{
-			x->pDepthMD = xnAllocateDepthMetaData();
-			x->pImageMD = xnAllocateImageMetaData();
-			x->pIrMD = xnAllocateIRMetaData();
+			x->pMapMetaData[DEPTH_GEN_INDEX] = (XnMapMetaData *)xnAllocateDepthMetaData();
+			x->pMapMetaData[IMAGE_GEN_INDEX] = (XnMapMetaData *)xnAllocateImageMetaData();
+			x->pMapMetaData[IR_GEN_INDEX] = (XnMapMetaData *)xnAllocateIRMetaData();
+			//x->pDepthMD = xnAllocateDepthMetaData();
+			//x->pImageMD = xnAllocateImageMetaData();
+			//x->pIrMD = xnAllocateIRMetaData();
 			//x->pSceneMD = xnAllocateSceneMetaData();
 		}
 	} 
@@ -160,9 +163,12 @@ t_jit_openni *jit_openni_new(void)
 
 void jit_openni_free(t_jit_openni *x)
 {
-	xnFreeDepthMetaData(x->pDepthMD);
-	xnFreeImageMetaData(x->pImageMD);
-	xnFreeIRMetaData(x->pIrMD);
+	xnFreeDepthMetaData((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX]);
+	xnFreeImageMetaData((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX]);
+	xnFreeIRMetaData((XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX]);
+	//xnFreeDepthMetaData(x->pDepthMD);
+	//xnFreeImageMetaData(x->pImageMD);
+	//xnFreeIRMetaData(x->pIrMD);
 	//xnFreeSceneMetaData(x->pSceneMD);
 	LOG_DEBUG("Shutting down OpenNI library");
 	xnShutdown(x->pContext);
@@ -222,40 +228,40 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 			LOG_DEBUG("updated generators");
 			
 			// setup the outputs to describe the depthmap TODO don't do this every time, only when it changes
-			out_minfo[DEPTH_GEN_INDEX].dim[0] = x->pDepthMD->pMap->FullRes.X;
-			out_minfo[DEPTH_GEN_INDEX].dim[1] = x->pDepthMD->pMap->FullRes.Y;
+			out_minfo[DEPTH_GEN_INDEX].dim[0] = ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->FullRes.X;
+			out_minfo[DEPTH_GEN_INDEX].dim[1] = ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->FullRes.Y;
 			jit_object_method(out_matrix[DEPTH_GEN_INDEX], _jit_sym_setinfo, &out_minfo[DEPTH_GEN_INDEX]);
 
 			// setup the outputs to describe the imagemap TODO don't do this every time, only when it changes
-			switch(x->pImageMD->pMap->PixelFormat)
+			switch(((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->PixelFormat)
 			{
 				case XN_PIXEL_FORMAT_RGB24:
 					LOG_DEBUG("XN_PIXEL_FORMAT_RGB24");
 					out_minfo[IMAGE_GEN_INDEX].type = _jit_sym_char;
 					out_minfo[IMAGE_GEN_INDEX].planecount = 4;
-					out_minfo[IMAGE_GEN_INDEX].dim[0] = x->pImageMD->pMap->FullRes.X;
-					out_minfo[IMAGE_GEN_INDEX].dim[1] = x->pImageMD->pMap->FullRes.Y;
+					out_minfo[IMAGE_GEN_INDEX].dim[0] = ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->FullRes.X;
+					out_minfo[IMAGE_GEN_INDEX].dim[1] = ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->FullRes.Y;
 					break;
 				case XN_PIXEL_FORMAT_YUV422:
 					LOG_DEBUG("XN_PIXEL_FORMAT_YUV422");
 					out_minfo[IMAGE_GEN_INDEX].type = _jit_sym_char;
 					out_minfo[IMAGE_GEN_INDEX].planecount = 4;
-					out_minfo[IMAGE_GEN_INDEX].dim[0] = x->pImageMD->pMap->FullRes.X / 2;	// trusting that X res will always be an even number
-					out_minfo[IMAGE_GEN_INDEX].dim[1] = x->pImageMD->pMap->FullRes.Y;
+					out_minfo[IMAGE_GEN_INDEX].dim[0] = ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->FullRes.X / 2;	// trusting that X res will always be an even number
+					out_minfo[IMAGE_GEN_INDEX].dim[1] = ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->FullRes.Y;
 					break;
 				case XN_PIXEL_FORMAT_GRAYSCALE_8_BIT:
 					LOG_DEBUG("XN_PIXEL_FORMAT_GRAYSCALE_8_BIT");
 					out_minfo[IMAGE_GEN_INDEX].type = _jit_sym_char;
 					out_minfo[IMAGE_GEN_INDEX].planecount = 1;
-					out_minfo[IMAGE_GEN_INDEX].dim[0] = x->pImageMD->pMap->FullRes.X;
-					out_minfo[IMAGE_GEN_INDEX].dim[1] = x->pImageMD->pMap->FullRes.Y;
+					out_minfo[IMAGE_GEN_INDEX].dim[0] = ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->FullRes.X;
+					out_minfo[IMAGE_GEN_INDEX].dim[1] = ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->FullRes.Y;
 					break;
 				case XN_PIXEL_FORMAT_GRAYSCALE_16_BIT:
 					LOG_DEBUG("XN_PIXEL_FORMAT_GRAYSCALE_16_BIT");
 					out_minfo[IMAGE_GEN_INDEX].type = _jit_sym_long;
 					out_minfo[IMAGE_GEN_INDEX].planecount = 1;
-					out_minfo[IMAGE_GEN_INDEX].dim[0] = x->pImageMD->pMap->FullRes.X;
-					out_minfo[IMAGE_GEN_INDEX].dim[1] = x->pImageMD->pMap->FullRes.Y;
+					out_minfo[IMAGE_GEN_INDEX].dim[0] = ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->FullRes.X;
+					out_minfo[IMAGE_GEN_INDEX].dim[1] = ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->FullRes.Y;
 					break;
 				default:
 					LOG_ERROR("Unsupported imagemap pixel format");
@@ -300,10 +306,10 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 			//LOG_DEBUG("updated generator(s)");
 
 			// manually copy depth array to jitter matrix because depth array is 16-bit unsigned ints and jitter method don't directly support them
-			copyDepthDatatoJitterMatrix(x->pDepthMD, out_bp[DEPTH_GEN_INDEX], &out_minfo[DEPTH_GEN_INDEX]);
+			copyDepthDatatoJitterMatrix(((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX]), out_bp[DEPTH_GEN_INDEX], &out_minfo[DEPTH_GEN_INDEX]);
 
 			// manually copy image array to jitter matrix because we may need to add alpha channel to matrix
-			copyImageDatatoJitterMatrix(x->pImageMD, out_bp[IMAGE_GEN_INDEX], &out_minfo[IMAGE_GEN_INDEX]);
+			copyImageDatatoJitterMatrix(((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX]), out_bp[IMAGE_GEN_INDEX], &out_minfo[IMAGE_GEN_INDEX]);
 		}
 	}
 	else
@@ -418,7 +424,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s) // TODO should this 
 	nRetVal = xnFindExistingNodeByType(x->pContext, XN_NODE_TYPE_DEPTH, &(x->hDepth));
 	if (nRetVal == XN_STATUS_OK)
 	{
-		xnGetDepthMetaData(x->hDepth, x->pDepthMD);
+		xnGetDepthMetaData(x->hDepth, (XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX]);
 	}
 #ifdef _DEBUG
 	else
@@ -430,7 +436,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s) // TODO should this 
 	nRetVal = xnFindExistingNodeByType(x->pContext, XN_NODE_TYPE_IMAGE, &(x->hImage));
 	if (nRetVal == XN_STATUS_OK)
 	{
-		xnGetImageMetaData(x->hImage, x->pImageMD);
+		xnGetImageMetaData(x->hImage, (XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX]);
 	}
 #ifdef _DEBUG
 	else
@@ -454,7 +460,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s) // TODO should this 
 	nRetVal = xnFindExistingNodeByType(x->pContext, XN_NODE_TYPE_IR, &(x->hIr));
 	if (nRetVal == XN_STATUS_OK)
 	{
-		xnGetIRMetaData(x->hIr, x->pIrMD);
+		xnGetIRMetaData(x->hIr, (XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX]);
 	}
 #ifdef _DEBUG
 	else
@@ -517,20 +523,20 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s) // TODO should this 
 	object_post((t_object*)x, "==Current active modes==");
 	if (x->hDepth)
 	{
-		object_post((t_object*)x, "DepthMD FPS=%lu FullX=%lu FullY=%lu Z=%u", x->pDepthMD->pMap->nFPS, x->pDepthMD->pMap->FullRes.X, x->pDepthMD->pMap->FullRes.Y, x->pDepthMD->nZRes);
-		object_post((t_object*)x, "DepthMD OffsetX=%lu OffsetY=%lu CropX=%lu CropY=%lu", x->pDepthMD->pMap->Offset.X, x->pDepthMD->pMap->Offset.Y, x->pDepthMD->pMap->Res.X, x->pDepthMD->pMap->Res.Y);
-		object_post((t_object*)x, "DepthMD PixelFormat=%s", xnPixelFormatToString(x->pDepthMD->pMap->PixelFormat));
+		object_post((t_object*)x, "DepthMD FPS=%lu FullX=%lu FullY=%lu Z=%u", ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->nFPS, ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->FullRes.X, ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->FullRes.Y, ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->nZRes);
+		object_post((t_object*)x, "DepthMD OffsetX=%lu OffsetY=%lu CropX=%lu CropY=%lu", ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->Offset.X, ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->Offset.Y, ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->Res.X, ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->Res.Y);
+		object_post((t_object*)x, "DepthMD PixelFormat=%s", xnPixelFormatToString(((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->PixelFormat));
 	}
 	if (x->hImage)
 	{
-		object_post((t_object*)x, "ImageMD FPS=%lu X=%lu Y=%lu", x->pImageMD->pMap->nFPS, x->pImageMD->pMap->FullRes.X, x->pImageMD->pMap->FullRes.Y);
-		object_post((t_object*)x, "ImageMD PixelFormat=%s", xnPixelFormatToString(x->pImageMD->pMap->PixelFormat));
+		object_post((t_object*)x, "ImageMD FPS=%lu X=%lu Y=%lu", ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->nFPS, ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->FullRes.X, ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->FullRes.Y);
+		object_post((t_object*)x, "ImageMD PixelFormat=%s", xnPixelFormatToString(((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->PixelFormat));
 	}
 	// TODO something for USER generator	
 	if (x->hIr)
 	{
-		object_post((t_object*)x, "IrMD FPS=%lu X=%lu Y=%lu", x->pIrMD->pMap->nFPS, x->pIrMD->pMap->FullRes.X, x->pIrMD->pMap->FullRes.Y);
-		object_post((t_object*)x, "IrMD PixelFormat=%s", xnPixelFormatToString(x->pIrMD->pMap->PixelFormat));
+		object_post((t_object*)x, "IrMD FPS=%lu X=%lu Y=%lu", ((XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX])->pMap->nFPS, ((XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX])->pMap->FullRes.X, ((XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX])->pMap->FullRes.Y);
+		object_post((t_object*)x, "IrMD PixelFormat=%s", xnPixelFormatToString(((XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX])->pMap->PixelFormat));
 	}
 #endif
 }
