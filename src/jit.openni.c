@@ -57,6 +57,7 @@ t_jit_err jit_openni_init(void)
 	mop = (t_jit_object*)jit_object_new(_jit_sym_jit_mop, 0, NUM_OPENNI_GENERATORS); // no matrix inputs, matrix outputs (generator outputs) + default dumpout
 																 // TODO allow arbitrary generator(s) therefore output(s)
 
+#ifdef DEPTH_GEN_INDEX
 	jit_mop_output_nolink(mop, DEPTH_GEN_INDEX + 1);				// setup the DEPTHmap
 	output = jit_object_method(mop, _jit_sym_getoutput, DEPTH_GEN_INDEX + 1);
 	jit_attr_setsym(output, _jit_sym_ioname, gensym("depthgen"));	// TODO unfortunately, this renames only 1 of the 4; remaining are dim, planecount, type
@@ -68,7 +69,9 @@ t_jit_err jit_openni_init(void)
 	jit_atom_setsym(&a_arr[1], _jit_sym_float32);
 	jit_atom_setsym(&a_arr[2], _jit_sym_float64);
 	jit_object_method(output,_jit_sym_types,3,a_arr);
+#endif
 
+#ifdef IMAGE_GEN_INDEX
 	jit_mop_output_nolink(mop, IMAGE_GEN_INDEX + 1);				// setup the rgb camera IMAGEmap
 	output = jit_object_method(mop, _jit_sym_getoutput, IMAGE_GEN_INDEX + 1);
 	jit_attr_setsym(output, _jit_sym_ioname, gensym("imagegen"));
@@ -85,7 +88,9 @@ t_jit_err jit_openni_init(void)
 	jit_atom_setsym(&a_arr[2], _jit_sym_float32);
 	jit_atom_setsym(&a_arr[3], _jit_sym_float64);
 	jit_object_method(output,_jit_sym_types,4,a_arr);
-	
+#endif
+
+#ifdef USER_GEN_INDEX
 	jit_mop_output_nolink(mop, USER_GEN_INDEX + 1);					// setup the user generator (skeleton)
 	output = jit_object_method(mop,_jit_sym_getoutput, USER_GEN_INDEX + 1);
 	jit_attr_setsym(output, _jit_sym_ioname, gensym("usergen"));
@@ -102,7 +107,9 @@ t_jit_err jit_openni_init(void)
 	jit_atom_setsym(&a_arr[1], _jit_sym_long);
 	jit_object_method(output,_jit_sym_types,2,a_arr);
 */
+#endif
 
+#ifdef IR_GEN_INDEX
 	jit_mop_output_nolink(mop, IR_GEN_INDEX + 1);				// setup the IR camera generator
 	output = jit_object_method(mop,_jit_sym_getoutput, IR_GEN_INDEX + 1);
 	jit_attr_setsym(output, _jit_sym_ioname, gensym("irgen"));
@@ -112,6 +119,7 @@ t_jit_err jit_openni_init(void)
 	jit_attr_setlong(output,_jit_sym_maxdimcount,2);
 	jit_atom_setsym(&a_arr[0], _jit_sym_long);					// set to be the default and only type allowed
 	jit_object_method(output,_jit_sym_types,1,a_arr);
+#endif
 
 	jit_class_addadornment(s_jit_openni_class, mop);
 
@@ -150,10 +158,6 @@ t_jit_openni *jit_openni_new(void)
 			x->pMapMetaData[DEPTH_GEN_INDEX] = (XnMapMetaData *)xnAllocateDepthMetaData();
 			x->pMapMetaData[IMAGE_GEN_INDEX] = (XnMapMetaData *)xnAllocateImageMetaData();
 			x->pMapMetaData[IR_GEN_INDEX] = (XnMapMetaData *)xnAllocateIRMetaData();
-			//x->pDepthMD = xnAllocateDepthMetaData();
-			//x->pImageMD = xnAllocateImageMetaData();
-			//x->pIrMD = xnAllocateIRMetaData();
-			//x->pSceneMD = xnAllocateSceneMetaData();
 		}
 	} 
 	LOG_DEBUG("object created");
@@ -166,10 +170,6 @@ void jit_openni_free(t_jit_openni *x)
 	xnFreeDepthMetaData((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX]);
 	xnFreeImageMetaData((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX]);
 	xnFreeIRMetaData((XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX]);
-	//xnFreeDepthMetaData(x->pDepthMD);
-	//xnFreeImageMetaData(x->pImageMD);
-	//xnFreeIRMetaData(x->pIrMD);
-	//xnFreeSceneMetaData(x->pSceneMD);
 	LOG_DEBUG("Shutting down OpenNI library");
 	xnShutdown(x->pContext);
 	LOG_DEBUG("object freed");
@@ -202,7 +202,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 	}
 
 	// if the object and both input and output matrices, both generators are valid, then process else error
-	if (x && bGotOutMatrices && (x->hDepth) && (x->hImage))	// TODO allow arbitrary generator(s)
+	if (x && bGotOutMatrices && (x->hProductionNode[DEPTH_GEN_INDEX]) && (x->hProductionNode[IMAGE_GEN_INDEX]))	// TODO allow arbitrary generator(s)
 	{
 		// lock input and output matrices
 		for (i = 0; i< NUM_OPENNI_GENERATORS; i++)
@@ -226,7 +226,12 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 		else
 		{
 			LOG_DEBUG("updated generators");
-			
+
+			for (i = 0; i< NUM_OPENNI_GENERATORS; i++)
+			{
+
+			}
+
 			// setup the outputs to describe the depthmap TODO don't do this every time, only when it changes
 			out_minfo[DEPTH_GEN_INDEX].dim[0] = ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->FullRes.X;
 			out_minfo[DEPTH_GEN_INDEX].dim[1] = ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->FullRes.Y;
@@ -397,6 +402,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s) // TODO should this 
 {
 	XnEnumerationErrors* pErrors;
 	XnStatus nRetVal = XN_STATUS_OK;
+	int i;
 
 	nRetVal = xnEnumerationErrorsAllocate(&pErrors);
 	CHECK_RC_ERROR_EXIT(nRetVal, "jit_openni_init_from_xml: cannot allocate errors object");
@@ -421,10 +427,11 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s) // TODO should this 
 		CHECK_RC_ERROR_EXIT(nRetVal, "XML config initialization open failed");
 	}
 	
-	nRetVal = xnFindExistingNodeByType(x->pContext, XN_NODE_TYPE_DEPTH, &(x->hDepth));
+	//TODO this next section of 4 production node types could refactor to be iteration through nodes acting on types
+	nRetVal = xnFindExistingNodeByType(x->pContext, XN_NODE_TYPE_DEPTH, &(x->hProductionNode[DEPTH_GEN_INDEX]));
 	if (nRetVal == XN_STATUS_OK)
 	{
-		xnGetDepthMetaData(x->hDepth, (XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX]);
+		xnGetDepthMetaData(x->hProductionNode[DEPTH_GEN_INDEX], (XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX]);
 	}
 #ifdef _DEBUG
 	else
@@ -433,10 +440,10 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s) // TODO should this 
 	}
 #endif
 
-	nRetVal = xnFindExistingNodeByType(x->pContext, XN_NODE_TYPE_IMAGE, &(x->hImage));
+	nRetVal = xnFindExistingNodeByType(x->pContext, XN_NODE_TYPE_IMAGE, &(x->hProductionNode[IMAGE_GEN_INDEX]));
 	if (nRetVal == XN_STATUS_OK)
 	{
-		xnGetImageMetaData(x->hImage, (XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX]);
+		xnGetImageMetaData(x->hProductionNode[IMAGE_GEN_INDEX], (XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX]);
 	}
 #ifdef _DEBUG
 	else
@@ -445,7 +452,8 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s) // TODO should this 
 	}
 #endif
 
-	nRetVal = xnFindExistingNodeByType(x->pContext, XN_NODE_TYPE_USER, &(x->hUser));
+#ifdef USER_GEN_INDEX
+	nRetVal = xnFindExistingNodeByType(x->pContext, XN_NODE_TYPE_USER, &(x->hProductionNode[USER_GEN_INDEX]));
 	if (nRetVal == XN_STATUS_OK)
 	{
 		LOG_DEBUG("may want to do some kind of USER generator preload here");
@@ -456,11 +464,12 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s) // TODO should this 
 		LOG_WARNING_RC(nRetVal, "XMLconfig no USER node created/found");
 	}
 #endif
+#endif
 
-	nRetVal = xnFindExistingNodeByType(x->pContext, XN_NODE_TYPE_IR, &(x->hIr));
+	nRetVal = xnFindExistingNodeByType(x->pContext, XN_NODE_TYPE_IR, &(x->hProductionNode[IR_GEN_INDEX]));
 	if (nRetVal == XN_STATUS_OK)
 	{
-		xnGetIRMetaData(x->hIr, (XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX]);
+		xnGetIRMetaData(x->hProductionNode[IR_GEN_INDEX], (XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX]);
 	}
 #ifdef _DEBUG
 	else
@@ -469,33 +478,36 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s) // TODO should this 
 	}
 #endif
 
-
-	if (!(x->hDepth || x->hImage || x->hUser || x->hIr))
+	// TODO maybe this can use xnEnumerateExistingNodes() instead
+	for (i=0; !(x->hProductionNode[i]); i++)
 	{
-		LOG_ERROR("XMLconfig must have at least one generator (other than recorder) to function correctly");
-		return;
-	}
-
-#ifdef _DEBUG
-	if (x->hDepth)
-	{
-		XnMapOutputMode *depthMapModes;
-		XnUInt32 i, numDepthMapModes = xnGetSupportedMapOutputModesCount(x->hDepth);
-		depthMapModes = (XnMapOutputMode *)malloc(sizeof(XnMapOutputMode) * numDepthMapModes);
-		xnGetSupportedMapOutputModes(x->hDepth, depthMapModes, &numDepthMapModes);
-		LOG_DEBUG2("== %lu Depth modes avail==", numDepthMapModes);
-		for (i=0; i<numDepthMapModes; i++)
+		if (i == NUM_OPENNI_GENERATORS - 1)
 		{
-			object_post((t_object*)x, "FPS=%lu X=%lu Y=%lu Z=%u", depthMapModes[i].nFPS, depthMapModes[i].nXRes, depthMapModes[i].nYRes, xnGetDeviceMaxDepth(x->hDepth));
+			LOG_ERROR("XMLconfig must have at least one generator to function correctly");
+			return;
 		}
 	}
 
-	if (x->hImage)
+#ifdef _DEBUG
+	if (x->hProductionNode[DEPTH_GEN_INDEX])
+	{
+		XnMapOutputMode *depthMapModes;
+		XnUInt32 i, numDepthMapModes = xnGetSupportedMapOutputModesCount(x->hProductionNode[DEPTH_GEN_INDEX]);
+		depthMapModes = (XnMapOutputMode *)malloc(sizeof(XnMapOutputMode) * numDepthMapModes);
+		xnGetSupportedMapOutputModes(x->hProductionNode[DEPTH_GEN_INDEX], depthMapModes, &numDepthMapModes);
+		LOG_DEBUG2("== %lu Depth modes avail==", numDepthMapModes);
+		for (i=0; i<numDepthMapModes; i++)
+		{
+			object_post((t_object*)x, "FPS=%lu X=%lu Y=%lu Z=%u", depthMapModes[i].nFPS, depthMapModes[i].nXRes, depthMapModes[i].nYRes, xnGetDeviceMaxDepth(x->hProductionNode[DEPTH_GEN_INDEX]));
+		}
+	}
+
+	if (x->hProductionNode[IMAGE_GEN_INDEX])
 	{
 		XnMapOutputMode *imageMapModes;
-		XnUInt32 i, numImageMapModes = xnGetSupportedMapOutputModesCount(x->hImage);
+		XnUInt32 i, numImageMapModes = xnGetSupportedMapOutputModesCount(x->hProductionNode[IMAGE_GEN_INDEX]);
 		imageMapModes = (XnMapOutputMode *)malloc(sizeof(XnMapOutputMode) * numImageMapModes);
-		xnGetSupportedMapOutputModes(x->hImage, imageMapModes, &numImageMapModes);
+		xnGetSupportedMapOutputModes(x->hProductionNode[IMAGE_GEN_INDEX], imageMapModes, &numImageMapModes);
 		LOG_DEBUG2("== %lu Image modes avail==", numImageMapModes);
 		for (i=0; i<numImageMapModes; i++)
 		{
@@ -503,16 +515,16 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s) // TODO should this 
 		}	
 	}
 
-//	if (x->hUser)
+//	if (x->hProductionNode[USER_GEN_INDEX])
 //	{
 //	}
 	
-	if (x->hIr)
+	if (x->hProductionNode[IR_GEN_INDEX])
 	{
 		XnMapOutputMode *IrMapModes;
-		XnUInt32 i, numIrMapModes = xnGetSupportedMapOutputModesCount(x->hIr);
+		XnUInt32 i, numIrMapModes = xnGetSupportedMapOutputModesCount(x->hProductionNode[IR_GEN_INDEX]);
 		IrMapModes = (XnMapOutputMode *)malloc(sizeof(XnMapOutputMode) * numIrMapModes);
-		xnGetSupportedMapOutputModes(x->hIr, IrMapModes, &numIrMapModes);
+		xnGetSupportedMapOutputModes(x->hProductionNode[IR_GEN_INDEX], IrMapModes, &numIrMapModes);
 		LOG_DEBUG2("== %lu IR modes avail==", numIrMapModes);
 		for (i=0; i<numIrMapModes; i++)
 		{
@@ -521,19 +533,19 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s) // TODO should this 
 	}
 
 	object_post((t_object*)x, "==Current active modes==");
-	if (x->hDepth)
+	if (x->hProductionNode[DEPTH_GEN_INDEX])
 	{
 		object_post((t_object*)x, "DepthMD FPS=%lu FullX=%lu FullY=%lu Z=%u", ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->nFPS, ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->FullRes.X, ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->FullRes.Y, ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->nZRes);
 		object_post((t_object*)x, "DepthMD OffsetX=%lu OffsetY=%lu CropX=%lu CropY=%lu", ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->Offset.X, ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->Offset.Y, ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->Res.X, ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->Res.Y);
 		object_post((t_object*)x, "DepthMD PixelFormat=%s", xnPixelFormatToString(((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->PixelFormat));
 	}
-	if (x->hImage)
+	if (x->hProductionNode[IMAGE_GEN_INDEX])
 	{
 		object_post((t_object*)x, "ImageMD FPS=%lu X=%lu Y=%lu", ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->nFPS, ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->FullRes.X, ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->FullRes.Y);
 		object_post((t_object*)x, "ImageMD PixelFormat=%s", xnPixelFormatToString(((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->PixelFormat));
 	}
 	// TODO something for USER generator	
-	if (x->hIr)
+	if (x->hProductionNode[IR_GEN_INDEX])
 	{
 		object_post((t_object*)x, "IrMD FPS=%lu X=%lu Y=%lu", ((XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX])->pMap->nFPS, ((XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX])->pMap->FullRes.X, ((XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX])->pMap->FullRes.Y);
 		object_post((t_object*)x, "IrMD PixelFormat=%s", xnPixelFormatToString(((XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX])->pMap->PixelFormat));

@@ -46,11 +46,11 @@
 //---------------------------------------------------------------------------
 
 #define JIT_OPENNI_VERSION "v0.3.5"
-#define NUM_OPENNI_GENERATORS 4
-#define DEPTH_GEN_INDEX 0
+#define NUM_OPENNI_GENERATORS 3
+#define DEPTH_GEN_INDEX 0	// BUGBUG currently all map generators MUST be first in order
 #define IMAGE_GEN_INDEX 1
 #define IR_GEN_INDEX 2
-#define USER_GEN_INDEX 3
+//#define USER_GEN_INDEX 3
 
 #define copyDepthDatatoJitterMatrix(a, b, c) copy16BitDatatoJitterMatrix(a, b, c)
 #define MAKEULONGFROMCHARS(a, b, c, d) ((unsigned long)((unsigned long)a | ((unsigned long)b << 8) | ((unsigned long)c << 16) | ((unsigned long)d << 24)))
@@ -128,12 +128,8 @@ typedef struct _max_jit_openni {
 typedef struct _jit_openni {
 	t_object	ob;
 	XnContext* pContext;
-	XnNodeHandle hDepth, hImage, hUser, hIr;
-	XnMapMetaData *pMapMetaData[3];
-	//XnDepthMetaData* pDepthMD;
-	//XnImageMetaData* pImageMD;
-	//XnIRMetaData* pIrMD;
-	//XnSceneMetaData* pSceneMD;
+	XnNodeHandle hProductionNode[NUM_OPENNI_GENERATORS];
+	XnMapMetaData *pMapMetaData[NUM_OPENNI_GENERATORS];	// really only need the number of map generators
 } t_jit_openni;
 
 
