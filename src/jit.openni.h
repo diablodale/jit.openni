@@ -129,6 +129,7 @@ typedef struct _jit_openni {
 	t_object	ob;
 	XnContext* pContext;
 	XnNodeHandle hProductionNode[NUM_OPENNI_GENERATORS];
+	boolean bHaveValidGeneratorProductionNode;
 	XnMapMetaData *pMapMetaData[NUM_OPENNI_GENERATORS];	// really only need the number of map generators
 } t_jit_openni;
 

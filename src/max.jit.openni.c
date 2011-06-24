@@ -235,7 +235,7 @@ void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 	void *mop = max_jit_obex_adornment_get(x,_jit_sym_jit_mop);
 	t_jit_err err;	
 	
-	LOG_DEBUG("starting custom outputmatrix");
+	LOG_DEBUG("starting custom outputmatrix()");
 	if (outputmode && mop)
 	{ //always output unless output mode is none
 		if (outputmode==1)

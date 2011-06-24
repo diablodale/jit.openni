@@ -142,6 +142,7 @@ t_jit_openni *jit_openni_new(void)
 	if (x)
 	{
 		XnStatus nRetVal = XN_STATUS_OK;
+		x->bHaveValidGeneratorProductionNode = false;
 
 		LOG_DEBUG("Initializing OpenNI library");
 		if (nRetVal = xnInit(&(x->pContext)))
@@ -165,6 +166,7 @@ void jit_openni_free(t_jit_openni *x)
 	xnFreeDepthMetaData((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX]);
 	xnFreeImageMetaData((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX]);
 	xnFreeIRMetaData((XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX]);
+	x->bHaveValidGeneratorProductionNode = false;
 	LOG_DEBUG("Shutting down OpenNI library");
 	xnShutdown(x->pContext);
 	LOG_DEBUG("object freed");
@@ -197,21 +199,16 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 	}
 
 	// if the object and both input and output matrices, both generators are valid, then process else error
-	if (x && bGotOutMatrices && (x->hProductionNode[DEPTH_GEN_INDEX]) && (x->hProductionNode[IMAGE_GEN_INDEX]))	// TODO allow arbitrary generator(s)
+	if (x && bGotOutMatrices && x->bHaveValidGeneratorProductionNode)
 	{
 		// lock input and output matrices
 		for (i = 0; i< NUM_OPENNI_GENERATORS; i++)
 		{
 			out_savelock[i] = (long) jit_object_method(out_matrix[i],_jit_sym_lock,1);
 		}
-	
-		// fill out matrix info structs for input and output
-		for (i = 0; i< NUM_OPENNI_GENERATORS; i++)
-		{
-			jit_object_method(out_matrix[i],_jit_sym_getinfo,&out_minfo[i]);
-		}
 
-		// BUGBUG put xnUpdate here
+		// Don't wait for new data, just update all generators with the newest already available
+		// TODO adjust codebase to optionally allow no new matrices to be output for generators that have no new data
 		nRetVal = xnWaitNoneUpdateAll(x->pContext);
 		if (nRetVal != XN_STATUS_OK)
 		{
@@ -223,11 +220,14 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 			LOG_DEBUG("updated generators");
 
 			// BUGBUG if I change the matrix type using the inspector while it is processing matrices, Max crashes
-			// BUGBUG this should instead look at productionNode and for the ones that are children of MapGenerators, do the following matrix resizing
 			// TODO don't do this every time, only when generators change
 			for (i = 0; i< NUM_OPENNI_GENERATORS; i++)
 			{
-				if (x->hProductionNode[i])
+				// fill out matrix info structs for input and output
+				jit_object_method(out_matrix[i],_jit_sym_getinfo,&out_minfo[i]);
+				
+				// BUGBUG this should instead look at productionNode and for the ones that are children of MapGenerators, do the following matrix resizing
+				if (x->hProductionNode[i])	// TODO restrict this to only work for maps
 				{
 					LOG_DEBUG3("generator[%d] pixelformat=%s", i, xnPixelFormatToString(((XnDepthMetaData *)x->pMapMetaData[i])->pMap->PixelFormat));
 					
@@ -263,54 +263,40 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 							goto out;
 					}
 					jit_object_method(out_matrix[i], _jit_sym_setinfo, &out_minfo[i]);
+#ifdef _DEBUG
+					// get dimensions/planecount
+					dimcount = out_minfo[i].dimcount;
+					for (j=0;j<dimcount;j++)
+					{
+						object_post((t_object*)x, "out%d dim[%d] = %d", i, j, out_minfo[i].dim[j]);
+					}
+					LOG_DEBUG3("out%d planes = %d", i, out_minfo[i].planecount);
+#endif
 				}
-			}
-
-			// get matrix data pointers
-			for (i = 0; i< NUM_OPENNI_GENERATORS; i++)
-			{
+				// get matrix data pointers
 				jit_object_method(out_matrix[i],_jit_sym_getdata,&out_bp[i]);
 				if (!out_bp[i]) { err=JIT_ERR_INVALID_OUTPUT; goto out;} // if data pointers are invalid, set error, and cleanup
 
-#ifdef _DEBUG
-				// get dimensions/planecount
-				dimcount = out_minfo[i].dimcount;
-				for (j=0;j<dimcount;j++)
-				{
-					object_post((t_object*)x, "out%d dim[%d] = %d", i, j, out_minfo[i].dim[j]);
-				}
-				LOG_DEBUG3("out%d planes = %d", i, out_minfo[i].planecount);
-#endif
+				// calculate, using the parallel utility function to
+				// call the calculate_ndim function in multiple
+				// threads if there are multiple processors available
+				//		jit_parallel_ndim_simplecalc1((method)jit_noise_calculate_ndim,	&vecdata,
+				//			dimcount, dim, planecount, &out_minfo, out_bp, 0 /* flags1 */);
+
+				// manually copy depth array to jitter matrix because depth array is 16-bit unsigned ints and jitter method don't directly support them
+				if (i == DEPTH_GEN_INDEX)
+					copyDepthDatatoJitterMatrix(((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX]), out_bp[DEPTH_GEN_INDEX], &out_minfo[DEPTH_GEN_INDEX]);
+				// manually copy image array to jitter matrix because we may need to add alpha channel to matrix
+				if (i == IMAGE_GEN_INDEX)
+					copyImageDatatoJitterMatrix(((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX]), out_bp[IMAGE_GEN_INDEX], &out_minfo[IMAGE_GEN_INDEX]);
+				if (i == IR_GEN_INDEX)
+					copyImageDatatoJitterMatrix(((XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX]), out_bp[IR_GEN_INDEX], &out_minfo[IR_GEN_INDEX]);
 			}
-		
-			// calculate, using the parallel utility function to
-			// call the calculate_ndim function in multiple
-			// threads if there are multiple processors available
-			//		jit_parallel_ndim_simplecalc1((method)jit_noise_calculate_ndim,	&vecdata,
-			//			dimcount, dim, planecount, &out_minfo, out_bp, 0 /* flags1 */);
-
-			// Don't wait for new data, just update all generators with the newest already available
-			// TODO adjust codebase to optionally allow no new matrices to be output for generators that have no new data
-			
-			//nRetVal = xnWaitNoneUpdateAll(x->pContext);
-			//if (nRetVal != XN_STATUS_OK)
-			//{
-			//	LOG_ERROR2("Failed updating generator nodes", xnGetStatusString(nRetVal));
-			//}
-			//else
-			//{
-			//LOG_DEBUG("updated generator(s)");
-
-			// TODO change to iteration
-			// manually copy depth array to jitter matrix because depth array is 16-bit unsigned ints and jitter method don't directly support them
-			copyDepthDatatoJitterMatrix(((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX]), out_bp[DEPTH_GEN_INDEX], &out_minfo[DEPTH_GEN_INDEX]);
-			// manually copy image array to jitter matrix because we may need to add alpha channel to matrix
-			copyImageDatatoJitterMatrix(((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX]), out_bp[IMAGE_GEN_INDEX], &out_minfo[IMAGE_GEN_INDEX]);
 		}
 	}
 	else
 	{
-		return JIT_ERR_INVALID_PTR;
+		return JIT_ERR_DATA_UNAVAILABLE;
 	}
 out:
 	// restore matrix lock state to previous value
@@ -478,6 +464,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s) // TODO should this 
 			return;
 		}
 	}
+	x->bHaveValidGeneratorProductionNode = true;
 
 #ifdef _DEBUG
 	if (x->hProductionNode[DEPTH_GEN_INDEX])
