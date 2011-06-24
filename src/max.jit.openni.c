@@ -152,7 +152,6 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 
 	if (object_obex_lookup(x, gensym("#P"), &mypatcher) != MAX_ERR_NONE)
 		LOG_ERROR("error getting patcher for jit.openni");
-	LOG_DEBUG2("my patcher is at address %lx",mypatcher);
 	mypatcherpath = object_attr_getsym(mypatcher, gensym("filepath"));
 	
 	// BUGBUG if I use _sym_nothing rather than gensym("") then I get linker error LNK2001: unresolved external symbol __common_symbols

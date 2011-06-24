@@ -45,7 +45,7 @@
 // Macros
 //---------------------------------------------------------------------------
 
-#define JIT_OPENNI_VERSION "v0.3.0"
+#define JIT_OPENNI_VERSION "v0.3.5"
 #define NUM_OPENNI_GENERATORS 4
 #define DEPTH_GEN_INDEX 0
 #define IMAGE_GEN_INDEX 1
@@ -128,9 +128,11 @@ typedef struct _max_jit_openni {
 typedef struct _jit_openni {
 	t_object	ob;
 	XnContext* pContext;
-	XnNodeHandle hDepth, hImage;
+	XnNodeHandle hDepth, hImage, hUser, hIr;
 	XnDepthMetaData* pDepthMD;
 	XnImageMetaData* pImageMD;
+	XnIRMetaData* pIrMD;
+	//XnSceneMetaData* pSceneMD;
 } t_jit_openni;
 
 

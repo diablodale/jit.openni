@@ -20,10 +20,10 @@
     </None>
     <None Include="TODO.txt" />
     <None Include="README" />
-    <None Include="jit.openni_config.xml">
+    <None Include="COPYING.txt" />
+    <None Include="bin\jit.openni_config.xml">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="COPYING.txt" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\targetver.h">

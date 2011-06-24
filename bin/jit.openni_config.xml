@@ -22,30 +22,31 @@
         <Mirror on="true"/>
       </Configuration>
     </Node>-->
+
     <Node type="Image" name="Image1" stopOnError="false">
       <Configuration>
         <Mirror on="true"/>
       </Configuration>
     </Node>
-		<Node type="Depth" name="Depth1">
+
+    <!-- IR is likely Grayscale 16-bit-->
+    <!--    <Node type="IR" name="Ir1">
+      <Configuration>
+        <MapOutputMode xRes="640" yRes="480" FPS="30"/>
+        <Mirror on="true"/>
+      </Configuration>
+    </Node>-->
+    <Node type="Depth" name="Depth1">
 		  <Configuration>
 			<!--<AlternativeViewPoint>Image1</AlternativeViewPoint>-->
 			  <Mirror on="true"/>
 		  </Configuration>
 		</Node>
-    <!-- IR is likely Grayscale 16-bit-->
-  <!--
-    <Node type="IR" name="Ir1">
-      <Configuration>
-        <Mirror on="true"/>
-      </Configuration>
-    </Node>
-    -->
     <!--
-    <Node type="User" />
-    <Node type="Gesture" />
-    <Node type="Hands" />
-    <Node type="Scene" />
+    <Node type="User" name="User1"/>
+    <Node type="Gesture" name="Gesture1"/>
+    <Node type="Hands" name="Hands1"/>
+    <Node type="Scene" name="Scene1"/>
     -->
     <!-- codec names are defined in XnCodecIDs.h
 		<Node type="Recorder" name="Recorder1" stopOnError="false">
