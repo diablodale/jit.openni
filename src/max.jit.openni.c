@@ -140,7 +140,6 @@ void max_jit_openni_free(t_max_jit_openni *x)
 
 void max_jit_openni_assist(t_max_jit_openni *x, void *b, long io, long index, char *s)
 {
-	int i;
 	t_jit_openni *pJit_OpenNI = max_jit_obex_jitob_get(x);
 
 	switch (io)
@@ -155,12 +154,11 @@ void max_jit_openni_assist(t_max_jit_openni *x, void *b, long io, long index, ch
 			}
 			else if (pJit_OpenNI->hProductionNode[index])
 			{
-				// TODO try to have the node type rather than the node name
-				snprintf_zero(s, 512, "(matrix) generator[%s]", xnGetNodeName(pJit_OpenNI->hProductionNode[index]));
+				snprintf_zero(s, 512, "(matrix) %s generator out%d", xnProductionNodeTypeToString(xnNodeInfoGetDescription(xnGetNodeInfo(pJit_OpenNI->hProductionNode[index]))->Type), index+1);
 			}
 			else
 			{
-				snprintf_zero(s, 512, "(matrix) unloaded generator[%d]", index);
+				snprintf_zero(s, 512, "(matrix) unloaded generator out%d", index+1);
 			}
 	}
 }

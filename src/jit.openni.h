@@ -45,14 +45,13 @@
 // Macros
 //---------------------------------------------------------------------------
 
-#define JIT_OPENNI_VERSION "v0.3.5"
+#define JIT_OPENNI_VERSION "v0.4.0"
 #define NUM_OPENNI_GENERATORS 3
 #define DEPTH_GEN_INDEX 0	// BUGBUG currently all map generators MUST be first in order
 #define IMAGE_GEN_INDEX 1
 #define IR_GEN_INDEX 2
 //#define USER_GEN_INDEX 3
 
-#define copyDepthDatatoJitterMatrix(a, b, c) copy16BitDatatoJitterMatrix(a, b, c)
 #define MAKEULONGFROMCHARS(a, b, c, d) ((unsigned long)((unsigned long)a | ((unsigned long)b << 8) | ((unsigned long)c << 16) | ((unsigned long)d << 24)))
 
 #define LOG_ERROR(what)														\
@@ -129,6 +128,7 @@ typedef struct _jit_openni {
 	t_object	ob;
 	XnContext* pContext;
 	XnNodeHandle hProductionNode[NUM_OPENNI_GENERATORS];
+	XnNodeInfoList* pProductionNodeList;
 	boolean bHaveValidGeneratorProductionNode;
 	XnMapMetaData *pMapMetaData[NUM_OPENNI_GENERATORS];	// really only need the number of map generators
 } t_jit_openni;
@@ -145,7 +145,7 @@ void			jit_openni_free					(t_jit_openni *x);
 void			jit_openni_init_from_xml		(t_jit_openni *x, t_symbol *s); // TODO should this return a t_jit_err?
 t_jit_err		jit_openni_matrix_calc			(t_jit_openni *x, void *inputs, void *outputs);
 void			copy16BitDatatoJitterMatrix		(XnDepthMetaData *pMapMetaData, char *bpOutJitterMatrix, t_jit_matrix_info *pOutJitterMatrixInfo);
-void			copyImageDatatoJitterMatrix		(XnImageMetaData *pImageMapMetaData, char *bpOutJitterMatrix, t_jit_matrix_info *pOutJitterMatrixInfo);
+void			copyMapGenDatatoJitterMatrix		(XnImageMetaData *pImageMapMetaData, char *bpOutJitterMatrix, t_jit_matrix_info *pOutJitterMatrixInfo);
 void			max_jit_openni_assist			(t_max_jit_openni *x, void *b, long io, long index, char *s);
 
 // max.jit.openni.c

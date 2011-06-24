@@ -36,6 +36,12 @@ Build notes-----------
 - You will need to change the build's include and library directories to match
   the locations in the Max SDK and OpenNI SDK.
 
+v0.4.0---------
+- supports rgb, depth, and ir camera output
+- now support more flexible matrix output formats for all generators
+- supports up to 3 generators outputting matrices all configured from your XML file
+- updated Win32 binary Max Jitter external
+
 v0.3.0---------
 - now fully supports output of RGB and depth maps
 - added in a compiled Win32 binary Max Jitter external

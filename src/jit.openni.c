@@ -54,7 +54,6 @@ t_jit_err jit_openni_init(void)
 
 	// add matrix operator (mop)
 	mop = (t_jit_object*)jit_object_new(_jit_sym_jit_mop, 0, NUM_OPENNI_GENERATORS); // no matrix inputs, matrix outputs (generator outputs) + default dumpout
-																 // TODO allow arbitrary generator(s) therefore output(s)
 
 #ifdef DEPTH_GEN_INDEX
 	//jit_mop_output_nolink(mop, DEPTH_GEN_INDEX + 1);				// if I nolink() then I can't change the attributes in the inspector
@@ -166,6 +165,7 @@ void jit_openni_free(t_jit_openni *x)
 	xnFreeDepthMetaData((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX]);
 	xnFreeImageMetaData((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX]);
 	xnFreeIRMetaData((XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX]);
+	if (x->pProductionNodeList) xnNodeInfoListFree(x->pProductionNodeList);
 	x->bHaveValidGeneratorProductionNode = false;
 	LOG_DEBUG("Shutting down OpenNI library");
 	xnShutdown(x->pContext);
@@ -229,6 +229,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 				// BUGBUG this should instead look at productionNode and for the ones that are children of MapGenerators, do the following matrix resizing
 				if (x->hProductionNode[i])	// TODO restrict this to only work for maps
 				{
+					LOG_DEBUG3("generator[%d] type=%s", i, xnProductionNodeTypeToString(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type));
 					LOG_DEBUG3("generator[%d] pixelformat=%s", i, xnPixelFormatToString(((XnDepthMetaData *)x->pMapMetaData[i])->pMap->PixelFormat));
 					
 					// setup the outputs to support the map's PixelFormat
@@ -283,14 +284,8 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 				//		jit_parallel_ndim_simplecalc1((method)jit_noise_calculate_ndim,	&vecdata,
 				//			dimcount, dim, planecount, &out_minfo, out_bp, 0 /* flags1 */);
 
-				// manually copy depth array to jitter matrix because depth array is 16-bit unsigned ints and jitter method don't directly support them
-				if (i == DEPTH_GEN_INDEX)
-					copyDepthDatatoJitterMatrix(((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX]), out_bp[DEPTH_GEN_INDEX], &out_minfo[DEPTH_GEN_INDEX]);
-				// manually copy image array to jitter matrix because we may need to add alpha channel to matrix
-				if (i == IMAGE_GEN_INDEX)
-					copyImageDatatoJitterMatrix(((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX]), out_bp[IMAGE_GEN_INDEX], &out_minfo[IMAGE_GEN_INDEX]);
-				if (i == IR_GEN_INDEX)
-					copyImageDatatoJitterMatrix(((XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX]), out_bp[IR_GEN_INDEX], &out_minfo[IR_GEN_INDEX]);
+				// manually copy OpenNI arrays to jitter matrix because jitter doesn't directly support them
+				copyMapGenDatatoJitterMatrix((XnImageMetaData *)x->pMapMetaData[i], out_bp[i], &out_minfo[i]);
 			}
 		}
 	}
@@ -309,12 +304,12 @@ out:
 
 void copy16BitDatatoJitterMatrix(XnDepthMetaData *pMapMetaData, char *bpOutJitterMatrix, t_jit_matrix_info *pOutJitterMatrixInfo)
 {
-	// this function assumes all parameters are valid
+	// this function assumes all parameters are valid, and requires that all map metadata's passed via pImageMapMetaData have the same byte location of the 	
 	
 	int i, j;
 	XnUInt16 *p16BitData; // aka XnDepthPixel or 16bit greysacale xnImagePixel
 	
-	p16BitData = (XnUInt16 *)pMapMetaData->pData;  // this ->pData assumes XnDepthMetaData struct, so XnImageMetaData must have pData in the same location TODO consider safer code
+	p16BitData = (XnUInt16 *)pMapMetaData->pData;  // this ->pData assumes XnDepthMetaData struct
 	for(i=0; i < pOutJitterMatrixInfo->dim[1]; i++)  // for each row
 	{
 		for(j=0; j < pOutJitterMatrixInfo->dim[0]; j++)  // go across each column
@@ -337,10 +332,9 @@ void copy16BitDatatoJitterMatrix(XnDepthMetaData *pMapMetaData, char *bpOutJitte
 	}
 }
 
-void copyImageDatatoJitterMatrix(XnImageMetaData *pImageMapMetaData, char *bpOutJitterMatrix, t_jit_matrix_info *pOutJitterMatrixInfo)
+void copyMapGenDatatoJitterMatrix(XnImageMetaData *pImageMapMetaData, char *bpOutJitterMatrix, t_jit_matrix_info *pOutJitterMatrixInfo)
 {
-	// this function assumes all parameters are valid
-	
+	// this function assumes all parameters are valid, and requires that all map metadata's passed via pImageMapMetaData have the same byte location of the 	
 	int i, j;
 	
 	if (pImageMapMetaData->pMap->PixelFormat != XN_PIXEL_FORMAT_GRAYSCALE_16_BIT)
@@ -379,6 +373,8 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s) // TODO should this 
 {
 	XnEnumerationErrors* pErrors;
 	XnStatus nRetVal = XN_STATUS_OK;
+	XnNodeInfoListIterator pCurrentNode;
+	XnNodeInfo* pProdNodeInfo;
 	int i;
 
 	nRetVal = xnEnumerationErrorsAllocate(&pErrors);
@@ -387,9 +383,8 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s) // TODO should this 
 	nRetVal = xnStopGeneratingAll(x->pContext);		// should stop generators in case we are loading a new XML file
 	CHECK_RC_ERROR_EXIT(nRetVal, "jit_openni_init_from_xml: cannot stop all generators before loading XML config");
 
-	LOG_DEBUG2("XMLconfig loading: %s", s->s_name);
 	nRetVal = xnContextRunXmlScriptFromFile(x->pContext, s->s_name, pErrors);	// TODO this doesn't seem to support loading a 2nd XML file
-
+																				// may need to iterate xnProductionNodeRelease() or xnShutdown()
 	if (nRetVal == XN_STATUS_NO_NODE_PRESENT)
 	{
 		XnChar strError[1024];
@@ -403,68 +398,31 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s) // TODO should this 
 	{
 		CHECK_RC_ERROR_EXIT(nRetVal, "XML config initialization open failed");
 	}
-	
-	//TODO this next section of 4 production node types could refactor to be iteration through nodes acting on types
-	nRetVal = xnFindExistingNodeByType(x->pContext, XN_NODE_TYPE_DEPTH, &(x->hProductionNode[DEPTH_GEN_INDEX]));
-	if (nRetVal == XN_STATUS_OK)
-	{
-		xnGetDepthMetaData(x->hProductionNode[DEPTH_GEN_INDEX], (XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX]);
-	}
-#ifdef _DEBUG
-	else
-	{
-		LOG_WARNING_RC(nRetVal, "XMLconfig no DEPTH node created/found");
-	}
-#endif
+	LOG_DEBUG2("XMLconfig loaded: %s", s->s_name);
 
-	nRetVal = xnFindExistingNodeByType(x->pContext, XN_NODE_TYPE_IMAGE, &(x->hProductionNode[IMAGE_GEN_INDEX]));
-	if (nRetVal == XN_STATUS_OK)
+	nRetVal = xnEnumerateExistingNodes(x->pContext,&x->pProductionNodeList); //TODO try this new style
+	CHECK_RC_ERROR_EXIT(nRetVal, "XMLconfig cannot enumerate existing production nodes");
+	for (pCurrentNode = xnNodeInfoListGetFirst(x->pProductionNodeList); xnNodeInfoListIteratorIsValid(pCurrentNode); pCurrentNode = xnNodeInfoListGetNext(pCurrentNode))
 	{
-		xnGetImageMetaData(x->hProductionNode[IMAGE_GEN_INDEX], (XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX]);
-	}
-#ifdef _DEBUG
-	else
-	{
-		LOG_WARNING_RC(nRetVal, "XMLconfig no IMAGE node created/found");
-	}
-#endif
-
-#ifdef USER_GEN_INDEX
-	nRetVal = xnFindExistingNodeByType(x->pContext, XN_NODE_TYPE_USER, &(x->hProductionNode[USER_GEN_INDEX]));
-	if (nRetVal == XN_STATUS_OK)
-	{
-		LOG_DEBUG("may want to do some kind of USER generator preload here");
-	}
-#ifdef _DEBUG
-	else
-	{
-		LOG_WARNING_RC(nRetVal, "XMLconfig no USER node created/found");
-	}
-#endif
-#endif
-
-	nRetVal = xnFindExistingNodeByType(x->pContext, XN_NODE_TYPE_IR, &(x->hProductionNode[IR_GEN_INDEX]));
-	if (nRetVal == XN_STATUS_OK)
-	{
-		xnGetIRMetaData(x->hProductionNode[IR_GEN_INDEX], (XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX]);
-	}
-#ifdef _DEBUG
-	else
-	{
-		LOG_WARNING_RC(nRetVal, "XMLconfig no IR node created/found");
-	}
-#endif
-
-	// TODO maybe this can use xnEnumerateExistingNodes() instead
-	for (i=0; !(x->hProductionNode[i]); i++)
-	{
-		if (i == NUM_OPENNI_GENERATORS - 1)
+		pProdNodeInfo = xnNodeInfoListGetCurrent(pCurrentNode);
+		LOG_DEBUG2("found prodnode type=%s", xnProductionNodeTypeToString(xnNodeInfoGetDescription(pProdNodeInfo)->Type));
+		x->bHaveValidGeneratorProductionNode = x->bHaveValidGeneratorProductionNode || xnIsTypeGenerator(xnNodeInfoGetDescription(pProdNodeInfo)->Type);
+		switch(xnNodeInfoGetDescription(pProdNodeInfo)->Type)
 		{
-			LOG_ERROR("XMLconfig must have at least one generator to function correctly");
-			return;
+		case XN_NODE_TYPE_DEPTH:
+			x->hProductionNode[DEPTH_GEN_INDEX] = xnNodeInfoGetHandle(pProdNodeInfo);
+			xnGetDepthMetaData(x->hProductionNode[DEPTH_GEN_INDEX], (XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX]);
+			break;
+		case XN_NODE_TYPE_IMAGE:
+			x->hProductionNode[IMAGE_GEN_INDEX] = xnNodeInfoGetHandle(pProdNodeInfo);
+			xnGetImageMetaData(x->hProductionNode[IMAGE_GEN_INDEX], (XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX]);
+			break;
+		case XN_NODE_TYPE_IR:
+			x->hProductionNode[IR_GEN_INDEX] = xnNodeInfoGetHandle(pProdNodeInfo);
+			xnGetIRMetaData(x->hProductionNode[IR_GEN_INDEX], (XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX]);
 		}
 	}
-	x->bHaveValidGeneratorProductionNode = true;
+	LOG_DEBUG2("bHaveValidGeneratorProductionNode=%d", x->bHaveValidGeneratorProductionNode);
 
 #ifdef _DEBUG
 	if (x->hProductionNode[DEPTH_GEN_INDEX])
