@@ -36,6 +36,12 @@ Build notes-----------
 - You will need to change the build's include and library directories to match
   the locations in the Max SDK and OpenNI SDK.
 
+v0.4.1---------
+- fixed several bugs in matrix_calc related to previously not updating the metadata for frames
+- fixed the bug regarding alternate viewpoint bad resizing behavior of depthmap
+- fixed the crashing bug that previously occurred when changing output matrix attributes
+- fixed bug with unseen symptom -> now unlock all jitter matrices correctly
+
 v0.4.0---------
 - supports rgb, depth, and ir camera output
 - now support more flexible matrix output formats for all generators

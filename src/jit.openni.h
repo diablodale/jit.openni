@@ -45,7 +45,7 @@
 // Macros
 //---------------------------------------------------------------------------
 
-#define JIT_OPENNI_VERSION "v0.4.0"
+#define JIT_OPENNI_VERSION "v0.4.1"
 #define NUM_OPENNI_GENERATORS 3
 #define DEPTH_GEN_INDEX 0	// BUGBUG currently all map generators MUST be first in order
 #define IMAGE_GEN_INDEX 1
@@ -127,7 +127,7 @@ typedef struct _max_jit_openni {
 typedef struct _jit_openni {
 	t_object	ob;
 	XnContext* pContext;
-	XnNodeHandle hProductionNode[NUM_OPENNI_GENERATORS];
+	XnNodeHandle hProductionNode[NUM_OPENNI_GENERATORS]; // this only holds production node GENERATORS!
 	XnNodeInfoList* pProductionNodeList;
 	boolean bHaveValidGeneratorProductionNode;
 	XnMapMetaData *pMapMetaData[NUM_OPENNI_GENERATORS];	// really only need the number of map generators

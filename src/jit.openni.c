@@ -69,7 +69,7 @@ t_jit_err jit_openni_init(void)
 #endif
 
 #ifdef IMAGE_GEN_INDEX
-	//jit_mop_output_nolink(mop, IMAGE_GEN_INDEX + 1);				// if I nolink() then I can't change the attributes in the inspector
+	jit_mop_output_nolink(mop, IMAGE_GEN_INDEX + 1);
 	output = jit_object_method(mop, _jit_sym_getoutput, IMAGE_GEN_INDEX + 1);
 	jit_attr_setlong(output,_jit_sym_minplanecount,1);
 	jit_attr_setlong(output,_jit_sym_maxplanecount,4);
@@ -87,7 +87,7 @@ t_jit_err jit_openni_init(void)
 #endif
 
 #ifdef USER_GEN_INDEX
-	//jit_mop_output_nolink(mop, USER_GEN_INDEX + 1);				// if I nolink() then I can't change the attributes in the inspector
+	jit_mop_output_nolink(mop, USER_GEN_INDEX + 1);
 	output = jit_object_method(mop,_jit_sym_getoutput, USER_GEN_INDEX + 1);
 /*
 	jit_attr_setlong(output,_jit_sym_minplanecount,1);
@@ -105,14 +105,16 @@ t_jit_err jit_openni_init(void)
 #endif
 
 #ifdef IR_GEN_INDEX
-	//jit_mop_output_nolink(mop, IR_GEN_INDEX + 1);				// if I nolink() then I can't change the attributes in the inspector
+	jit_mop_output_nolink(mop, IR_GEN_INDEX + 1);
 	output = jit_object_method(mop,_jit_sym_getoutput, IR_GEN_INDEX + 1);
 	jit_attr_setlong(output,_jit_sym_minplanecount,1);
 	jit_attr_setlong(output,_jit_sym_maxplanecount,1);
 	jit_attr_setlong(output,_jit_sym_mindimcount,2);
 	jit_attr_setlong(output,_jit_sym_maxdimcount,2);
-	jit_atom_setsym(&a_arr[0], _jit_sym_long);					// set to be the default and only type allowed
-	jit_object_method(output,_jit_sym_types,1,a_arr);
+	jit_atom_setsym(&a_arr[0], _jit_sym_long);					// set to be the default
+	jit_atom_setsym(&a_arr[1], _jit_sym_float32);
+	jit_atom_setsym(&a_arr[2], _jit_sym_float64);
+	jit_object_method(output,_jit_sym_types,3,a_arr);
 #endif
 
 	jit_class_addadornment(s_jit_openni_class, mop);
@@ -162,6 +164,11 @@ t_jit_openni *jit_openni_new(void)
 
 void jit_openni_free(t_jit_openni *x)
 {
+	XnStatus nRetVal = XN_STATUS_OK;
+
+	if (x->pContext) nRetVal = xnStopGeneratingAll(x->pContext);
+	CHECK_RC_ERROR_EXIT(nRetVal, "jit_openni_free(): cannot stop all generators");
+
 	xnFreeDepthMetaData((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX]);
 	xnFreeImageMetaData((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX]);
 	xnFreeIRMetaData((XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX]);
@@ -175,17 +182,14 @@ void jit_openni_free(t_jit_openni *x)
 
 t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 {
-	// TODO parallelize this with a jit_openni_calculate_ndim
-
 	t_jit_err err=JIT_ERR_NONE;
 	long out_savelock[NUM_OPENNI_GENERATORS];
-	t_jit_matrix_info out_minfo[NUM_OPENNI_GENERATORS];
-	char *out_bp[NUM_OPENNI_GENERATORS];	// char* so can reference down to a single byte as needed
+	t_jit_matrix_info out_minfo;
+	char *out_bp;	// char* so can reference down to a single byte as needed
 	long i, j, dimcount;
 	void *out_matrix[NUM_OPENNI_GENERATORS];
 	boolean bGotOutMatrices = true;
 	XnStatus nRetVal = XN_STATUS_OK;
-	XnUInt32 nMiddleIndex;
 
 	// get the zeroth index input and output from
 	// the corresponding input and output lists
@@ -201,14 +205,13 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 	// if the object and both input and output matrices, both generators are valid, then process else error
 	if (x && bGotOutMatrices && x->bHaveValidGeneratorProductionNode)
 	{
-		// lock input and output matrices
+		// lock input and output matrices TODO its possible to move this inside the below i through NUM_OPENNI_GENERATORS iteration if it is not important for all matrices to be locked before any work
 		for (i = 0; i< NUM_OPENNI_GENERATORS; i++)
 		{
 			out_savelock[i] = (long) jit_object_method(out_matrix[i],_jit_sym_lock,1);
 		}
 
 		// Don't wait for new data, just update all generators with the newest already available
-		// TODO adjust codebase to optionally allow no new matrices to be output for generators that have no new data
 		nRetVal = xnWaitNoneUpdateAll(x->pContext);
 		if (nRetVal != XN_STATUS_OK)
 		{
@@ -218,86 +221,106 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 		else
 		{
 			LOG_DEBUG("updated generators");
-
-			// BUGBUG if I change the matrix type using the inspector while it is processing matrices, Max crashes
-			// TODO don't do this every time, only when generators change
 			for (i = 0; i< NUM_OPENNI_GENERATORS; i++)
 			{
-				// fill out matrix info structs for input and output
-				jit_object_method(out_matrix[i],_jit_sym_getinfo,&out_minfo[i]);
-				
-				// BUGBUG this should instead look at productionNode and for the ones that are children of MapGenerators, do the following matrix resizing
-				if (x->hProductionNode[i])	// TODO restrict this to only work for maps
+				// TODO this could instead look at productionNode and for the ones that are generators, do the following matrix setup/resizing
+				// TODO adjust codebase to optionally allow no new matrices to be output for generators that have no new data
+				if (x->hProductionNode[i])
 				{
+					// fill out matrix info structs for input and output
+					jit_object_method(out_matrix[i],_jit_sym_getinfo,&out_minfo);
+
 					LOG_DEBUG3("generator[%d] type=%s", i, xnProductionNodeTypeToString(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type));
+					LOG_DEBUG3("generator[%d] derived from map=%s", i, xnIsTypeDerivedFrom(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type, XN_NODE_TYPE_MAP_GENERATOR) ? "true":"false");
 					LOG_DEBUG3("generator[%d] pixelformat=%s", i, xnPixelFormatToString(((XnDepthMetaData *)x->pMapMetaData[i])->pMap->PixelFormat));
-					
-					// setup the outputs to support the map's PixelFormat
-					switch(((XnDepthMetaData *)x->pMapMetaData[i])->pMap->PixelFormat)
-					{
-						case XN_PIXEL_FORMAT_RGB24:
-							out_minfo[i].type = _jit_sym_char;
-							out_minfo[i].planecount = 4;
-							out_minfo[i].dim[0] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.X;
-							out_minfo[i].dim[1] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.Y;
-							break;
-						case XN_PIXEL_FORMAT_YUV422:
-							out_minfo[i].type = _jit_sym_char;
-							out_minfo[i].planecount = 4;
-							out_minfo[i].dim[0] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.X / 2;	// trusting that X res will always be an even number
-							out_minfo[i].dim[1] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.Y;
-							break;
-						case XN_PIXEL_FORMAT_GRAYSCALE_8_BIT:
-							out_minfo[i].type = _jit_sym_char;
-							out_minfo[i].planecount = 1;
-							out_minfo[i].dim[0] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.X;
-							out_minfo[i].dim[1] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.Y;
-							break;
-						case XN_PIXEL_FORMAT_GRAYSCALE_16_BIT:
-							out_minfo[i].planecount = 1;
-							out_minfo[i].dim[0] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.X;
-							out_minfo[i].dim[1] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.Y;
-							break;
-						default:
-							LOG_ERROR2("Unsupported PixelFormat", xnPixelFormatToString(((XnDepthMetaData *)x->pMapMetaData[i])->pMap->PixelFormat));
-							err=JIT_ERR_MISMATCH_TYPE;
-							goto out;
-					}
-					jit_object_method(out_matrix[i], _jit_sym_setinfo, &out_minfo[i]);
 #ifdef _DEBUG
-					// get dimensions/planecount
-					dimcount = out_minfo[i].dimcount;
-					for (j=0;j<dimcount;j++)
-					{
-						object_post((t_object*)x, "out%d dim[%d] = %d", i, j, out_minfo[i].dim[j]);
-					}
-					LOG_DEBUG3("out%d planes = %d", i, out_minfo[i].planecount);
+					if (!xnIsDataNew(x->hProductionNode[i])) LOG_WARNING2("generator[%d] No new data", i); //TODO remove this debug once no new data->no new matrix output is implemented
 #endif
+					if (xnIsTypeDerivedFrom(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type, XN_NODE_TYPE_MAP_GENERATOR)) //TODO perhaps make an array during XMLConfig and here do a quick loopup
+					{
+						switch(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type)	//TODO without using C++ can I call just one function to update all metadata types?
+						{
+						case XN_NODE_TYPE_DEPTH:
+							xnGetDepthMetaData(x->hProductionNode[i], (XnDepthMetaData *)x->pMapMetaData[i]);
+							break;
+						case XN_NODE_TYPE_IMAGE:
+							xnGetImageMetaData(x->hProductionNode[i], (XnImageMetaData *)x->pMapMetaData[i]);
+							break;
+						case XN_NODE_TYPE_IR:
+							xnGetIRMetaData(x->hProductionNode[i], (XnIRMetaData *)x->pMapMetaData[i]);
+						}
+						LOG_DEBUG("updated metadata for incoming map generator frame");
+						LOG_DEBUG3("generator[%d] gotNew=%s", i, ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->bIsNew ? "true":"false"); // TODO remove this, output should match LOG_WARNING above
+
+						// setup the outputs to support the map's PixelFormat
+						switch(((XnDepthMetaData *)x->pMapMetaData[i])->pMap->PixelFormat)
+						{
+							case XN_PIXEL_FORMAT_RGB24:
+								out_minfo.type = _jit_sym_char;
+								out_minfo.planecount = 4;
+								out_minfo.dim[0] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.X;
+								out_minfo.dim[1] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.Y;
+								break;
+							case XN_PIXEL_FORMAT_YUV422:
+								out_minfo.type = _jit_sym_char;
+								out_minfo.planecount = 4;
+								out_minfo.dim[0] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.X / 2;	// trusting that X res will always be an even number
+								out_minfo.dim[1] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.Y;
+								break;
+							case XN_PIXEL_FORMAT_GRAYSCALE_8_BIT:
+								out_minfo.type = _jit_sym_char;
+								out_minfo.planecount = 1;
+								out_minfo.dim[0] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.X;
+								out_minfo.dim[1] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.Y;
+								break;
+							case XN_PIXEL_FORMAT_GRAYSCALE_16_BIT:
+								out_minfo.planecount = 1;
+								out_minfo.dim[0] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.X;
+								out_minfo.dim[1] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.Y;
+								break;
+							default:
+								LOG_ERROR2("Unsupported PixelFormat", xnPixelFormatToString(((XnDepthMetaData *)x->pMapMetaData[i])->pMap->PixelFormat));
+								err=JIT_ERR_MISMATCH_TYPE;
+								goto out;
+						}
+						jit_object_method(out_matrix[i], _jit_sym_setinfo, &out_minfo);
+						jit_object_method(out_matrix[i], _jit_sym_getinfo, &out_minfo);	// BUGBU for some reason, I have to call this or Max crashes when you change matrix attributes via inspector
+	#ifdef _DEBUG
+						// get dimensions/planecount
+						dimcount = out_minfo.dimcount;
+						for (j=0;j<dimcount;j++)
+						{
+							object_post((t_object*)x, "out%d dim[%d] = %d", i, j, out_minfo.dim[j]);
+						}
+						LOG_DEBUG3("out%d planes = %d", i, out_minfo.planecount);
+						LOG_DEBUG3("out%d type = %s", i, out_minfo.type->s_name);
+	#endif
+						// get matrix data pointers
+						jit_object_method(out_matrix[i],_jit_sym_getdata,&out_bp);
+						if (!out_bp) { err=JIT_ERR_INVALID_OUTPUT; goto out;} // if data pointers are invalid, set error, and cleanup
+
+						// TODO calculate, using the parallel utility function to
+						// call the calculate_ndim function in multiple
+						// threads if there are multiple processors available
+						//		jit_parallel_ndim_simplecalc1((method)jit_noise_calculate_ndim,	&vecdata,
+						//			dimcount, dim, planecount, &out_minfo, out_bp, 0 /* flags1 */);
+
+						// manually copy OpenNI arrays to jitter matrix because jitter doesn't directly support them
+						copyMapGenDatatoJitterMatrix((XnImageMetaData *)x->pMapMetaData[i], out_bp, &out_minfo);
+					}
 				}
-				// get matrix data pointers
-				jit_object_method(out_matrix[i],_jit_sym_getdata,&out_bp[i]);
-				if (!out_bp[i]) { err=JIT_ERR_INVALID_OUTPUT; goto out;} // if data pointers are invalid, set error, and cleanup
-
-				// calculate, using the parallel utility function to
-				// call the calculate_ndim function in multiple
-				// threads if there are multiple processors available
-				//		jit_parallel_ndim_simplecalc1((method)jit_noise_calculate_ndim,	&vecdata,
-				//			dimcount, dim, planecount, &out_minfo, out_bp, 0 /* flags1 */);
-
-				// manually copy OpenNI arrays to jitter matrix because jitter doesn't directly support them
-				copyMapGenDatatoJitterMatrix((XnImageMetaData *)x->pMapMetaData[i], out_bp[i], &out_minfo[i]);
 			}
+		}
+out:
+		// restore matrix lock state to previous value
+		for (i = 0; i< NUM_OPENNI_GENERATORS; i++)
+		{
+			jit_object_method(out_matrix[i],_jit_sym_lock,out_savelock[i]);
 		}
 	}
 	else
 	{
-		return JIT_ERR_DATA_UNAVAILABLE;
-	}
-out:
-	// restore matrix lock state to previous value
-	for (i = 0; i< NUM_OPENNI_GENERATORS; i++)
-	{
-		jit_object_method(out_matrix[i],_jit_sym_lock,out_savelock[i]);
+		return JIT_ERR_INVALID_OUTPUT;
 	}
 	return err;
 }
@@ -308,7 +331,7 @@ void copy16BitDatatoJitterMatrix(XnDepthMetaData *pMapMetaData, char *bpOutJitte
 	
 	int i, j;
 	XnUInt16 *p16BitData; // aka XnDepthPixel or 16bit greysacale xnImagePixel
-	
+
 	p16BitData = (XnUInt16 *)pMapMetaData->pData;  // this ->pData assumes XnDepthMetaData struct
 	for(i=0; i < pOutJitterMatrixInfo->dim[1]; i++)  // for each row
 	{
@@ -339,7 +362,10 @@ void copyMapGenDatatoJitterMatrix(XnImageMetaData *pImageMapMetaData, char *bpOu
 	
 	if (pImageMapMetaData->pMap->PixelFormat != XN_PIXEL_FORMAT_GRAYSCALE_16_BIT)
 	{
-		XnUInt8 *pImageMap = (XnUInt8 *)pImageMapMetaData->pData;
+		XnUInt8 *pImageMap;
+
+		pImageMap = (XnUInt8 *)pImageMapMetaData->pData;
+
 		for(i=0; i < pOutJitterMatrixInfo->dim[1]; i++) // for each row
 		{
 			for(j=0; j < pOutJitterMatrixInfo->dim[0]; j++)  // go across each column
@@ -350,11 +376,12 @@ void copyMapGenDatatoJitterMatrix(XnImageMetaData *pImageMapMetaData, char *bpOu
 						((unsigned long *)bpOutJitterMatrix)[j] = MAKEULONGFROMCHARS(0xFF, pImageMap[0], pImageMap[1], pImageMap[2]); // not tested on big endian systems
 						pImageMap += 3;
 						break;
-					case XN_PIXEL_FORMAT_YUV422:	// TODO can likely use jitter's 4-plane matrix copying function for this, ordering is U, Y1, V, Y2
+					case XN_PIXEL_FORMAT_YUV422:	// ordering is U, Y1, V, Y2; if I give up sources that are not 4-bte aligned, I could use Jitter matrix copying functions
 						((unsigned long *)bpOutJitterMatrix)[j] = MAKEULONGFROMCHARS(pImageMap[0], pImageMap[1], pImageMap[2], pImageMap[3]); // not tested on big endian systems
 						pImageMap += 4;
 						break;
-					case XN_PIXEL_FORMAT_GRAYSCALE_8_BIT: // TODO could likely use jitter's 1-plane matrix copying function for this, also could support long, float32, float64 output matrices
+					case XN_PIXEL_FORMAT_GRAYSCALE_8_BIT:	// if I give up sources that are not 4-bte aligned, I could use Jitter matrix copying functions
+															// TODO add support for long, float32, float64 output matrices
 						bpOutJitterMatrix[j] = *pImageMap++;
 						break;
 					// case XN_PIXEL_FORMAT_GRAYSCALE_16_BIT is now handled below by calling a shared function copy16BitDatatoJitterMatrix()
@@ -369,13 +396,12 @@ void copyMapGenDatatoJitterMatrix(XnImageMetaData *pImageMapMetaData, char *bpOu
 	}
 }
 
-void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s) // TODO should this return a t_jit_err?
+void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s)
 {
 	XnEnumerationErrors* pErrors;
 	XnStatus nRetVal = XN_STATUS_OK;
 	XnNodeInfoListIterator pCurrentNode;
 	XnNodeInfo* pProdNodeInfo;
-	int i;
 
 	nRetVal = xnEnumerationErrorsAllocate(&pErrors);
 	CHECK_RC_ERROR_EXIT(nRetVal, "jit_openni_init_from_xml: cannot allocate errors object");
@@ -400,12 +426,14 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s) // TODO should this 
 	}
 	LOG_DEBUG2("XMLconfig loaded: %s", s->s_name);
 
-	nRetVal = xnEnumerateExistingNodes(x->pContext,&x->pProductionNodeList); //TODO try this new style
+	nRetVal = xnEnumerateExistingNodes(x->pContext,&x->pProductionNodeList);
 	CHECK_RC_ERROR_EXIT(nRetVal, "XMLconfig cannot enumerate existing production nodes");
 	for (pCurrentNode = xnNodeInfoListGetFirst(x->pProductionNodeList); xnNodeInfoListIteratorIsValid(pCurrentNode); pCurrentNode = xnNodeInfoListGetNext(pCurrentNode))
 	{
 		pProdNodeInfo = xnNodeInfoListGetCurrent(pCurrentNode);
 		LOG_DEBUG2("found prodnode type=%s", xnProductionNodeTypeToString(xnNodeInfoGetDescription(pProdNodeInfo)->Type));
+		LOG_DEBUG2("Derived from map=%s", xnIsTypeDerivedFrom(xnNodeInfoGetDescription(pProdNodeInfo)->Type, XN_NODE_TYPE_MAP_GENERATOR) ? "true":"false");
+
 		x->bHaveValidGeneratorProductionNode = x->bHaveValidGeneratorProductionNode || xnIsTypeGenerator(xnNodeInfoGetDescription(pProdNodeInfo)->Type);
 		switch(xnNodeInfoGetDescription(pProdNodeInfo)->Type)
 		{
@@ -423,6 +451,9 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s) // TODO should this 
 		}
 	}
 	LOG_DEBUG2("bHaveValidGeneratorProductionNode=%d", x->bHaveValidGeneratorProductionNode);
+
+	nRetVal = xnStartGeneratingAll(x->pContext);
+	CHECK_RC_ERROR_EXIT(nRetVal, "XMLconfig cannot start all generator nodes");
 
 #ifdef _DEBUG
 	if (x->hProductionNode[DEPTH_GEN_INDEX])

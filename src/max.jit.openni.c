@@ -64,7 +64,7 @@ int main(void)
     
 	// add default methods and attributes for MOP max wrapper class
 	max_jit_classex_mop_wrap(p, q, MAX_JIT_MOP_FLAGS_OWN_OUTPUTMATRIX|MAX_JIT_MOP_FLAGS_OWN_JIT_MATRIX|MAX_JIT_MOP_FLAGS_OWN_ADAPT); // attrs & methods for name, type, dim, planecount, bang, outputmatrix, etc
-	
+
 	// wrap the Jitter class with the standard methods for Jitter objects, e.g. getattributes, dumpout, maxjitclassaddmethods, etc
 	max_jit_classex_standard_wrap(p, q, 0);
 
