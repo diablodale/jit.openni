@@ -45,7 +45,7 @@
 // Macros
 //---------------------------------------------------------------------------
 
-#define JIT_OPENNI_VERSION "v0.4.1"
+#define JIT_OPENNI_VERSION "v0.4.2"
 #define NUM_OPENNI_GENERATORS 3
 #define DEPTH_GEN_INDEX 0	// BUGBUG currently all map generators MUST be first in order
 #define IMAGE_GEN_INDEX 1
@@ -144,9 +144,9 @@ t_jit_openni	*jit_openni_new(void);
 void			jit_openni_free					(t_jit_openni *x);
 void			jit_openni_init_from_xml		(t_jit_openni *x, t_symbol *s); // TODO should this return a t_jit_err?
 t_jit_err		jit_openni_matrix_calc			(t_jit_openni *x, void *inputs, void *outputs);
-void			copy16BitDatatoJitterMatrix		(XnDepthMetaData *pMapMetaData, char *bpOutJitterMatrix, t_jit_matrix_info *pOutJitterMatrixInfo);
-void			copyMapGenDatatoJitterMatrix		(XnImageMetaData *pImageMapMetaData, char *bpOutJitterMatrix, t_jit_matrix_info *pOutJitterMatrixInfo);
+void			copy16BitDatatoJitterMatrix		(XnDepthMetaData *pMapMetaData, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, long rowOffset);
 void			max_jit_openni_assist			(t_max_jit_openni *x, void *b, long io, long index, char *s);
+void			jit_openni_calculate_ndim		(XnDepthMetaData *pMapMetaData, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, t_jit_parallel_ndim_worker *para_worker);
 
 // max.jit.openni.c
 t_jit_err		jit_openni_init					(void);

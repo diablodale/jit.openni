@@ -40,10 +40,10 @@
     </Node>
     -->
     
-    <!--<AlternativeViewPoint>Image1</AlternativeViewPoint>-->
     <Node type="Depth" name="Depth1">
 		  <Configuration>
-			  <Mirror on="true"/>
+        <AlternativeViewPoint>Image1</AlternativeViewPoint>
+        <Mirror on="true"/>
 		  </Configuration>
 		</Node>
     

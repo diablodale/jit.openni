@@ -291,6 +291,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 						for (j=0;j<dimcount;j++)
 						{
 							object_post((t_object*)x, "out%d dim[%d] = %d", i, j, out_minfo.dim[j]);
+							object_post((t_object*)x, "out%d dimstride[%d] = %d", i, j, out_minfo.dimstride[j]);
 						}
 						LOG_DEBUG3("out%d planes = %d", i, out_minfo.planecount);
 						LOG_DEBUG3("out%d type = %s", i, out_minfo.type->s_name);
@@ -299,14 +300,9 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 						jit_object_method(out_matrix[i],_jit_sym_getdata,&out_bp);
 						if (!out_bp) { err=JIT_ERR_INVALID_OUTPUT; goto out;} // if data pointers are invalid, set error, and cleanup
 
-						// TODO calculate, using the parallel utility function to
-						// call the calculate_ndim function in multiple
-						// threads if there are multiple processors available
-						//		jit_parallel_ndim_simplecalc1((method)jit_noise_calculate_ndim,	&vecdata,
-						//			dimcount, dim, planecount, &out_minfo, out_bp, 0 /* flags1 */);
-
 						// manually copy OpenNI arrays to jitter matrix because jitter doesn't directly support them
-						copyMapGenDatatoJitterMatrix((XnImageMetaData *)x->pMapMetaData[i], out_bp, &out_minfo);
+						// by using the Jitter parallel functions
+						jit_parallel_ndim_simplecalc1((method)jit_openni_calculate_ndim, x->pMapMetaData[i], out_minfo.dimcount, out_minfo.dim, out_minfo.planecount, &out_minfo, out_bp, 0);
 					}
 				}
 			}
@@ -325,74 +321,79 @@ out:
 	return err;
 }
 
-void copy16BitDatatoJitterMatrix(XnDepthMetaData *pMapMetaData, char *bpOutJitterMatrix, t_jit_matrix_info *pOutJitterMatrixInfo)
+void copy16BitDatatoJitterMatrix(XnDepthMetaData *pMapMetaData, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, long rowOffset)
 {
-	// this function assumes all parameters are valid, and requires that all map metadata's passed via pImageMapMetaData have the same byte location of the 	
+	// this function assumes all parameters are valid, and requires that all map metadata's passed via pMapMetaData have the same byte location of the 	
 	
 	int i, j;
 	XnUInt16 *p16BitData; // aka XnDepthPixel or 16bit greysacale xnImagePixel
 
-	p16BitData = (XnUInt16 *)pMapMetaData->pData;  // this ->pData assumes XnDepthMetaData struct
-	for(i=0; i < pOutJitterMatrixInfo->dim[1]; i++)  // for each row
+	// this ->pData assumes XnDepthMetaData struct, and pointer arithmetic automatically jumps by 2 bytes
+	p16BitData = (XnUInt16 *)pMapMetaData->pData + (rowOffset * pMapMetaData->pMap->FullRes.X);
+	
+	for(i=0; i < dim[1]; i++)  // for each row
 	{
-		for(j=0; j < pOutJitterMatrixInfo->dim[0]; j++)  // go across each column
+		for(j=0; j < dim[0]; j++)  // go across each column
 		{
-			if (pOutJitterMatrixInfo->type == _jit_sym_long)
+			if (minfo1->type == _jit_sym_long)
 			{
-				((unsigned long *)bpOutJitterMatrix)[j] = *p16BitData;
+				((unsigned long *)bp1)[j] = *p16BitData;
 			}
-			else if (pOutJitterMatrixInfo->type == _jit_sym_float32)
+			else if (minfo1->type == _jit_sym_float32)
 			{
-				((float *)bpOutJitterMatrix)[j] = *p16BitData;
+				((float *)bp1)[j] = *p16BitData;
 			}
 			else // it is _jit_sym_float64
 			{
-				((double *)bpOutJitterMatrix)[j] = *p16BitData;
+				((double *)bp1)[j] = *p16BitData;
 			}
 			p16BitData++;
 		}
-		bpOutJitterMatrix += pOutJitterMatrixInfo->dimstride[1];
+		bp1 += minfo1->dimstride[1];
 	}
 }
 
-void copyMapGenDatatoJitterMatrix(XnImageMetaData *pImageMapMetaData, char *bpOutJitterMatrix, t_jit_matrix_info *pOutJitterMatrixInfo)
+void jit_openni_calculate_ndim(XnDepthMetaData *pMapMetaData, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, t_jit_parallel_ndim_worker *para_worker)
 {
-	// this function assumes all parameters are valid, and requires that all map metadata's passed via pImageMapMetaData have the same byte location of the 	
+	// this function assumes all parameters are valid, and requires that all map metadata's passed via pMapMetaData have the same byte location of the 	
+	// uses the t_jit_parallel_ndim_worker undocumented functionality as posted in the formums at http://cycling74.com/forums/topic.php?id=24525
 	int i, j;
-	
-	if (pImageMapMetaData->pMap->PixelFormat != XN_PIXEL_FORMAT_GRAYSCALE_16_BIT)
+	long rowOffset = para_worker->offset[1];
+
+	if (pMapMetaData->pMap->PixelFormat != XN_PIXEL_FORMAT_GRAYSCALE_16_BIT)
 	{
-		XnUInt8 *pImageMap;
+		XnUInt8 *pMapData;
 
-		pImageMap = (XnUInt8 *)pImageMapMetaData->pData;
+		// this ->pData assumes XnDepthMetaData struct, and pointer arithmetic jumps only 1 bytes so need to multiply by PixelFormat size
+		pMapData = (XnUInt8 *)pMapMetaData->pData + (rowOffset * (pMapMetaData->pMap->FullRes.X * xnGetBytesPerPixelForPixelFormat(pMapMetaData->pMap->PixelFormat)));
 
-		for(i=0; i < pOutJitterMatrixInfo->dim[1]; i++) // for each row
+		for(i=0; i < dim[1]; i++) // for each row
 		{
-			for(j=0; j < pOutJitterMatrixInfo->dim[0]; j++)  // go across each column
+			for(j=0; j < dim[0]; j++)  // go across each column
 			{
-				switch(pImageMapMetaData->pMap->PixelFormat)
+				switch(pMapMetaData->pMap->PixelFormat)
 				{
 					case XN_PIXEL_FORMAT_RGB24:
-						((unsigned long *)bpOutJitterMatrix)[j] = MAKEULONGFROMCHARS(0xFF, pImageMap[0], pImageMap[1], pImageMap[2]); // not tested on big endian systems
-						pImageMap += 3;
+						((unsigned long *)bp1)[j] = MAKEULONGFROMCHARS(0xFF, pMapData[0], pMapData[1], pMapData[2]); // not tested on big endian systems
+						pMapData += 3;
 						break;
 					case XN_PIXEL_FORMAT_YUV422:	// ordering is U, Y1, V, Y2; if I give up sources that are not 4-bte aligned, I could use Jitter matrix copying functions
-						((unsigned long *)bpOutJitterMatrix)[j] = MAKEULONGFROMCHARS(pImageMap[0], pImageMap[1], pImageMap[2], pImageMap[3]); // not tested on big endian systems
-						pImageMap += 4;
+						((unsigned long *)bp1)[j] = MAKEULONGFROMCHARS(pMapData[0], pMapData[1], pMapData[2], pMapData[3]); // not tested on big endian systems
+						pMapData += 4;
 						break;
 					case XN_PIXEL_FORMAT_GRAYSCALE_8_BIT:	// if I give up sources that are not 4-bte aligned, I could use Jitter matrix copying functions
 															// TODO add support for long, float32, float64 output matrices
-						bpOutJitterMatrix[j] = *pImageMap++;
+						bp1[j] = *pMapData++;
 						break;
 					// case XN_PIXEL_FORMAT_GRAYSCALE_16_BIT is now handled below by calling a shared function copy16BitDatatoJitterMatrix()
 				}
 			}
-			bpOutJitterMatrix += pOutJitterMatrixInfo->dimstride[1];
+			bp1 += minfo1->dimstride[1];
 		}
 	}
 	else
 	{
-		copy16BitDatatoJitterMatrix((XnDepthMetaData *)pImageMapMetaData, bpOutJitterMatrix, pOutJitterMatrixInfo);
+		copy16BitDatatoJitterMatrix(pMapMetaData, dimcount, dim, planecount, minfo1, bp1, rowOffset);
 	}
 }
 

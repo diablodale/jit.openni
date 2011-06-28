@@ -36,6 +36,9 @@ Build notes-----------
 - You will need to change the build's include and library directories to match
   the locations in the Max SDK and OpenNI SDK.
 
+v0.4.2---------
+- matrix data copy operations now run in parallel using the Jitter parallel utility module
+
 v0.4.1---------
 - fixed several bugs in matrix_calc related to previously not updating the metadata for frames
 - fixed the bug regarding alternate viewpoint bad resizing behavior of depthmap
