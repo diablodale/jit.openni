@@ -45,12 +45,12 @@
 // Macros
 //---------------------------------------------------------------------------
 
-#define JIT_OPENNI_VERSION "v0.4.2"
-#define NUM_OPENNI_GENERATORS 3
+#define JIT_OPENNI_VERSION "v0.5.0"
+#define NUM_OPENNI_GENERATORS 4
 #define DEPTH_GEN_INDEX 0	// BUGBUG currently all map generators MUST be first in order
 #define IMAGE_GEN_INDEX 1
 #define IR_GEN_INDEX 2
-//#define USER_GEN_INDEX 3
+#define USER_GEN_INDEX 3
 
 #define MAKEULONGFROMCHARS(a, b, c, d) ((unsigned long)((unsigned long)a | ((unsigned long)b << 8) | ((unsigned long)c << 16) | ((unsigned long)d << 24)))
 
@@ -131,6 +131,9 @@ typedef struct _jit_openni {
 	XnNodeInfoList* pProductionNodeList;
 	boolean bHaveValidGeneratorProductionNode;
 	XnMapMetaData *pMapMetaData[NUM_OPENNI_GENERATORS];	// really only need the number of map generators
+	XnCallbackHandle hUserCallbacks, hCalibrationCallbacks, hPoseCallbacks;
+	XnBool bNeedPose;
+	XnChar strRequiredCalibrationPose[20];
 } t_jit_openni;
 
 
@@ -147,6 +150,11 @@ t_jit_err		jit_openni_matrix_calc			(t_jit_openni *x, void *inputs, void *output
 void			copy16BitDatatoJitterMatrix		(XnDepthMetaData *pMapMetaData, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, long rowOffset);
 void			max_jit_openni_assist			(t_max_jit_openni *x, void *b, long io, long index, char *s);
 void			jit_openni_calculate_ndim		(XnDepthMetaData *pMapMetaData, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, t_jit_parallel_ndim_worker *para_worker);
+void __stdcall	User_NewUser					(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x);
+void __stdcall	User_LostUser					(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x);
+void __stdcall UserPose_PoseDetected	(XnNodeHandle hPoseCapability, const XnChar *strPose, XnUserID userID, t_jit_openni *x);
+void __stdcall UserCalibration_CalibrationStart(XnNodeHandle hSkeletonCapability, XnUserID userID, t_jit_openni *x);
+void __stdcall UserCalibration_CalibrationEnd	(XnNodeHandle hSkeletonCapability, XnUserID userID, XnBool bSuccess, t_jit_openni *x);
 
 // max.jit.openni.c
 t_jit_err		jit_openni_init					(void);

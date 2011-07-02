@@ -144,6 +144,7 @@ t_jit_openni *jit_openni_new(void)
 	{
 		XnStatus nRetVal = XN_STATUS_OK;
 		x->bHaveValidGeneratorProductionNode = false;
+		x->bNeedPose = false;
 
 		LOG_DEBUG("Initializing OpenNI library");
 		if (nRetVal = xnInit(&(x->pContext)))
@@ -231,13 +232,13 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 					jit_object_method(out_matrix[i],_jit_sym_getinfo,&out_minfo);
 
 					LOG_DEBUG3("generator[%d] type=%s", i, xnProductionNodeTypeToString(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type));
-					LOG_DEBUG3("generator[%d] derived from map=%s", i, xnIsTypeDerivedFrom(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type, XN_NODE_TYPE_MAP_GENERATOR) ? "true":"false");
-					LOG_DEBUG3("generator[%d] pixelformat=%s", i, xnPixelFormatToString(((XnDepthMetaData *)x->pMapMetaData[i])->pMap->PixelFormat));
+					LOG_DEBUG3("generator[%d] is derived from map=%s", i, xnIsTypeDerivedFrom(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type, XN_NODE_TYPE_MAP_GENERATOR) ? "true":"false");
 #ifdef _DEBUG
 					if (!xnIsDataNew(x->hProductionNode[i])) LOG_WARNING2("generator[%d] No new data", i); //TODO remove this debug once no new data->no new matrix output is implemented
 #endif
 					if (xnIsTypeDerivedFrom(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type, XN_NODE_TYPE_MAP_GENERATOR)) //TODO perhaps make an array during XMLConfig and here do a quick loopup
 					{
+						LOG_DEBUG3("generator[%d] pixelformat=%s", i, xnPixelFormatToString(((XnDepthMetaData *)x->pMapMetaData[i])->pMap->PixelFormat));
 						switch(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type)	//TODO without using C++ can I call just one function to update all metadata types?
 						{
 						case XN_NODE_TYPE_DEPTH:
@@ -449,6 +450,37 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s)
 		case XN_NODE_TYPE_IR:
 			x->hProductionNode[IR_GEN_INDEX] = xnNodeInfoGetHandle(pProdNodeInfo);
 			xnGetIRMetaData(x->hProductionNode[IR_GEN_INDEX], (XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX]);
+			break;
+		case XN_NODE_TYPE_USER:
+			x->hProductionNode[USER_GEN_INDEX] = xnNodeInfoGetHandle(pProdNodeInfo);
+			xnRegisterUserCallbacks(x->hProductionNode[USER_GEN_INDEX], User_NewUser, User_LostUser, x, &(x->hUserCallbacks));
+
+			// check for then setup skeleton support
+			if (xnIsCapabilitySupported(x->hProductionNode[USER_GEN_INDEX], XN_CAPABILITY_SKELETON))
+			{
+				xnRegisterCalibrationCallbacks(x->hProductionNode[USER_GEN_INDEX], UserCalibration_CalibrationStart, UserCalibration_CalibrationEnd, x, &(x->hCalibrationCallbacks));
+				if (xnNeedPoseForSkeletonCalibration (x->hProductionNode[USER_GEN_INDEX]))
+				{
+					x->bNeedPose = true;
+					if (xnIsCapabilitySupported(x->hProductionNode[USER_GEN_INDEX], XN_CAPABILITY_POSE_DETECTION))
+					{
+						xnRegisterToPoseCallbacks(x->hProductionNode[USER_GEN_INDEX], UserPose_PoseDetected, NULL, x, &(x->hPoseCallbacks));
+						xnGetSkeletonCalibrationPose(x->hProductionNode[USER_GEN_INDEX], x->strRequiredCalibrationPose);
+					}
+					else
+					{
+						LOG_ERROR("Pose required for skeleton, but user generator doesn't support detecting poses");
+						// TODO this should fallback to consider user generator output other than a skeleton
+					}
+
+				}
+				xnSetSkeletonProfile(x->hProductionNode[USER_GEN_INDEX], XN_SKEL_PROFILE_ALL);
+			}
+			else
+			{
+				LOG_DEBUG("User generator doesn't support skeleton");
+				// TODO consider user generator output other than a skeleton
+			}
 		}
 	}
 	LOG_DEBUG2("bHaveValidGeneratorProductionNode=%d", x->bHaveValidGeneratorProductionNode);
@@ -483,9 +515,18 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s)
 		}	
 	}
 
-//	if (x->hProductionNode[USER_GEN_INDEX])
-//	{
-//	}
+	if (x->hProductionNode[USER_GEN_INDEX])
+	{
+		LOG_DEBUG("== Created user generator ==");
+		if (xnIsCapabilitySupported(x->hProductionNode[USER_GEN_INDEX], XN_CAPABILITY_SKELETON))
+		{
+			LOG_DEBUG("Supports skeletons");
+			if (xnNeedPoseForSkeletonCalibration (x->hProductionNode[USER_GEN_INDEX]))
+			{
+				LOG_DEBUG("Skeleton needs a pose");
+			}
+		}
+	}
 	
 	if (x->hProductionNode[IR_GEN_INDEX])
 	{
@@ -519,8 +560,65 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s)
 		object_post((t_object*)x, "IrMD PixelFormat=%s", xnPixelFormatToString(((XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX])->pMap->PixelFormat));
 	}
 #endif
+
+}
+// ---------- user and skeleton generator code -----------------
+
+// Callback: New user was detected
+void __stdcall User_NewUser(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x)
+{
+	LOG_DEBUG2("New User %d\n", userID);	// TODO is the needed x pointer geting passed and this output occurring?
+	// New user found
+	if (x->bNeedPose)
+	{
+		xnStartPoseDetection(hUserGenerator, x->strRequiredCalibrationPose, userID);
+	}
+	else
+	{
+		xnRequestSkeletonCalibration(hUserGenerator, userID, true);
+	}
 }
 
+// Callback: An existing user was lost
+void __stdcall User_LostUser(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x)
+{
+	LOG_DEBUG2("Lost user %d\n", userID);
+}
 
+// Callback: Detected a pose
+void __stdcall UserPose_PoseDetected(XnNodeHandle hPoseCapability, const XnChar *strPose, XnUserID userID, t_jit_openni *x)
+{
+	LOG_DEBUG3("Pose %s detected for user %d\n", strPose, userID);
+	xnStopPoseDetection(hPoseCapability, userID);
+	xnRequestSkeletonCalibration(hPoseCapability, userID, true);
+}
 
+// Callback: Started calibration
+void __stdcall UserCalibration_CalibrationStart(XnNodeHandle hSkeletonCapability, XnUserID userID, t_jit_openni *x)
+{
+	LOG_DEBUG2("Calibration started for user %d", userID);
+}
 
+// Callback: Finished calibration
+void __stdcall UserCalibration_CalibrationEnd(XnNodeHandle hSkeletonCapability, XnUserID userID, XnBool bSuccess, t_jit_openni *x)
+{
+	if (bSuccess)
+	{
+		// Calibration succeeded
+		LOG_DEBUG2("Calibration complete, start tracking user %d", userID);
+		xnStartSkeletonTracking(hSkeletonCapability, userID);
+	}
+	else
+	{
+		// Calibration failed
+		LOG_DEBUG2("Calibration failed for user %d", userID);
+		if (x->bNeedPose)
+		{
+			xnStartPoseDetection(hSkeletonCapability, x->strRequiredCalibrationPose, userID); // BUGBUG this 1st param may need to be the direct user generator
+		}
+		else
+		{
+			xnRequestSkeletonCalibration(hSkeletonCapability, userID, true);	// BUGBUG this 1st param may need to be the direct user generator
+		}
+	}
+}
