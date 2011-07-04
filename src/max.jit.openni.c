@@ -142,23 +142,30 @@ void max_jit_openni_assist(t_max_jit_openni *x, void *b, long io, long index, ch
 {
 	t_jit_openni *pJit_OpenNI = max_jit_obex_jitob_get(x);
 
+	// I acknowledge the code below is redundant
 	switch (io)
 	{
 		case 1:
 			strncpy_zero(s, "(text) read filename.xml only", 512);
 			break;
 		case 2:
-			if (index == NUM_OPENNI_GENERATORS)
+			switch (index)
 			{
+			//if (pJit_OpenNI->hProductionNode[index]) snprintf_zero(s, 512, "(matrix) %s generator out%d", xnProductionNodeTypeToString(xnNodeInfoGetDescription(xnGetNodeInfo(pJit_OpenNI->hProductionNode[index]))->Type), index+1);
+			case DEPTHMAP_OUTPUT_INDEX:
+				snprintf_zero(s, 512, "(matrix) %s generator out%d", DEPTHMAP_ASSIST_TEXT, index+1);
+				break;
+			case IMAGEMAP_OUTPUT_INDEX:
+				snprintf_zero(s, 512, "(matrix) %s generator out%d", IMAGEMAP_ASSIST_TEXT, index+1);
+				break;
+			case IRMAP_OUTPUT_INDEX:
+				snprintf_zero(s, 512, "(matrix) %s generator out%d", IRMAP_ASSIST_TEXT, index+1);
+				break;
+			case USERPIXELMAP_OUTPUT_INDEX:
+				snprintf_zero(s, 512, "(matrix) %s generator out%d", USERPIXELMAP_ASSIST_TEXT, index+1);
+				break;
+			case NUM_JITOPENNI_OUTPUTS:
 				strncpy_zero(s, "dumpout", 512);
-			}
-			else if (pJit_OpenNI->hProductionNode[index])
-			{
-				snprintf_zero(s, 512, "(matrix) %s generator out%d", xnProductionNodeTypeToString(xnNodeInfoGetDescription(xnGetNodeInfo(pJit_OpenNI->hProductionNode[index]))->Type), index+1);
-			}
-			else
-			{
-				snprintf_zero(s, 512, "(matrix) unloaded generator out%d", index+1);
 			}
 	}
 }
@@ -195,7 +202,7 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 
 	if (argc == 0) // if no argument supplied, ask for file
 	{
-		if (open_dialog(filename, &filePathID, &outType, &fileType, 1)) //BUGBUG
+		if (open_dialog(filename, &filePathID, &outType, &fileType, 1))
 		{
 			// non-zero: user cancelled or error
 			LOG_ERROR("error getting XML config file from dialog box for max.jit.openni");

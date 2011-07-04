@@ -46,11 +46,27 @@
 //---------------------------------------------------------------------------
 
 #define JIT_OPENNI_VERSION "v0.5.0"
+#define MAX_NUM_USERS_SUPPORTED 15	// I have not found an OpenNI API to determine the max number possible
 #define NUM_OPENNI_GENERATORS 4
 #define DEPTH_GEN_INDEX 0	// BUGBUG currently all map generators MUST be first in order
 #define IMAGE_GEN_INDEX 1
 #define IR_GEN_INDEX 2
 #define USER_GEN_INDEX 3
+
+#define NUM_OPENNI_MAPS 4
+#define DEPTHMAP_OUTPUT_INDEX 0	// BUGBUG currently all map generators MUST be first in order
+#define IMAGEMAP_OUTPUT_INDEX 1
+#define IRMAP_OUTPUT_INDEX 2
+#define USERPIXELMAP_OUTPUT_INDEX 3
+
+#define DEPTHMAP_ASSIST_TEXT "depthmap"	// if adding or removing assist text definitions, update max_jit_openni_assist() in max.jit.openni.c
+#define IMAGEMAP_ASSIST_TEXT "imagemap"
+#define IRMAP_ASSIST_TEXT "irmap"
+#define USERPIXELMAP_ASSIST_TEXT "userpixelsmap"
+
+
+#define NUM_JITOPENNI_OUTPUTS (NUM_OPENNI_MAPS)	// this is the total number of outputs on the jit.open external not counting dumpout.
+
 
 #define MAKEULONGFROMCHARS(a, b, c, d) ((unsigned long)((unsigned long)a | ((unsigned long)b << 8) | ((unsigned long)c << 16) | ((unsigned long)d << 24)))
 
@@ -130,10 +146,11 @@ typedef struct _jit_openni {
 	XnNodeHandle hProductionNode[NUM_OPENNI_GENERATORS]; // this only holds production node GENERATORS!
 	XnNodeInfoList* pProductionNodeList;
 	boolean bHaveValidGeneratorProductionNode;
-	XnMapMetaData *pMapMetaData[NUM_OPENNI_GENERATORS];	// really only need the number of map generators
+	XnMapMetaData *pMapMetaData[NUM_OPENNI_MAPS];
+	XnUserID aUserIDs[MAX_NUM_USERS_SUPPORTED];
 	XnCallbackHandle hUserCallbacks, hCalibrationCallbacks, hPoseCallbacks;
 	XnBool bNeedPose;
-	XnChar strRequiredCalibrationPose[20];
+	XnChar strRequiredCalibrationPose[XN_MAX_NAME_LENGTH];
 } t_jit_openni;
 
 
@@ -147,6 +164,7 @@ t_jit_openni	*jit_openni_new(void);
 void			jit_openni_free					(t_jit_openni *x);
 void			jit_openni_init_from_xml		(t_jit_openni *x, t_symbol *s); // TODO should this return a t_jit_err?
 t_jit_err		jit_openni_matrix_calc			(t_jit_openni *x, void *inputs, void *outputs);
+t_jit_err		changeMatrixOutputGivenMapMetaData(void *pMetaData, t_jit_matrix_info *pMatrixOut);
 void			copy16BitDatatoJitterMatrix		(XnDepthMetaData *pMapMetaData, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, long rowOffset);
 void			max_jit_openni_assist			(t_max_jit_openni *x, void *b, long io, long index, char *s);
 void			jit_openni_calculate_ndim		(XnDepthMetaData *pMapMetaData, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, t_jit_parallel_ndim_worker *para_worker);

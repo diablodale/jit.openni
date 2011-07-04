@@ -36,6 +36,13 @@ Build notes-----------
 - You will need to change the build's include and library directories to match
   the locations in the Max SDK and OpenNI SDK.
 
+v0.5.0---------
+- outputs user pixel maps which show the pixels for recognized users on an output map; value=0 indicated no user, other values are the user's ID
+- refactoring to start accommodating generators which have multiple capabilities
+- much groundwork to support skeletons
+- changed max assist text approach
+- switched to Max memory (de)allocation functions
+
 v0.4.2---------
 - matrix data copy operations now run in parallel using the Jitter parallel utility module
 

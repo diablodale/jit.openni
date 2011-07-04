@@ -53,11 +53,11 @@ t_jit_err jit_openni_init(void)
 	s_jit_openni_class = jit_class_new("jit_openni", (method)jit_openni_new, (method)jit_openni_free, sizeof(t_jit_openni), 0);
 
 	// add matrix operator (mop)
-	mop = (t_jit_object*)jit_object_new(_jit_sym_jit_mop, 0, NUM_OPENNI_GENERATORS); // no matrix inputs, matrix outputs (generator outputs) + default dumpout
+	mop = (t_jit_object*)jit_object_new(_jit_sym_jit_mop, 0, NUM_JITOPENNI_OUTPUTS); // no matrix inputs, matrix outputs (generator outputs) + default dumpout
 
-#ifdef DEPTH_GEN_INDEX
-	//jit_mop_output_nolink(mop, DEPTH_GEN_INDEX + 1);				// if I nolink() then I can't change the attributes in the inspector
-	output = jit_object_method(mop, _jit_sym_getoutput, DEPTH_GEN_INDEX + 1);
+#ifdef DEPTHMAP_OUTPUT_INDEX
+	//jit_mop_output_nolink(mop, DEPTHMAP_OUTPUT_INDEX + 1);				// if I nolink() then I can't change the attributes in the inspector
+	output = jit_object_method(mop, _jit_sym_getoutput, DEPTHMAP_OUTPUT_INDEX + 1);
 	jit_attr_setlong(output,_jit_sym_minplanecount,1);
 	jit_attr_setlong(output,_jit_sym_maxplanecount,1);
 	jit_attr_setlong(output,_jit_sym_mindimcount,2);
@@ -68,9 +68,9 @@ t_jit_err jit_openni_init(void)
 	jit_object_method(output,_jit_sym_types,3,a_arr);
 #endif
 
-#ifdef IMAGE_GEN_INDEX
-	jit_mop_output_nolink(mop, IMAGE_GEN_INDEX + 1);
-	output = jit_object_method(mop, _jit_sym_getoutput, IMAGE_GEN_INDEX + 1);
+#ifdef IMAGEMAP_OUTPUT_INDEX
+	jit_mop_output_nolink(mop, IMAGEMAP_OUTPUT_INDEX + 1);
+	output = jit_object_method(mop, _jit_sym_getoutput, IMAGEMAP_OUTPUT_INDEX + 1);
 	jit_attr_setlong(output,_jit_sym_minplanecount,1);
 	jit_attr_setlong(output,_jit_sym_maxplanecount,4);
 	jit_attr_setlong(output,_jit_sym_mindimcount,2);
@@ -86,27 +86,22 @@ t_jit_err jit_openni_init(void)
 	jit_object_method(output,_jit_sym_types,4,a_arr);
 #endif
 
-#ifdef USER_GEN_INDEX
-	jit_mop_output_nolink(mop, USER_GEN_INDEX + 1);
-	output = jit_object_method(mop,_jit_sym_getoutput, USER_GEN_INDEX + 1);
-/*
+#ifdef USERPIXELMAP_OUTPUT_INDEX
+	jit_mop_output_nolink(mop, USERPIXELMAP_OUTPUT_INDEX + 1);
+	output = jit_object_method(mop,_jit_sym_getoutput, USERPIXELMAP_OUTPUT_INDEX + 1);
 	jit_attr_setlong(output,_jit_sym_minplanecount,1);
-	jit_attr_setlong(output,_jit_sym_maxplanecount,4);
+	jit_attr_setlong(output,_jit_sym_maxplanecount,1);
 	jit_attr_setlong(output,_jit_sym_mindimcount,2);
 	jit_attr_setlong(output,_jit_sym_maxdimcount,2);
-	//jit_atom_setlong(&a_arr[0], 640);
-	//jit_atom_setlong(&a_arr[1], 480);
-	//jit_object_method(output,_jit_sym_maxdim,2,a_arr);
-	//jit_object_method(output,_jit_sym_mindim,2,a_arr);
-	jit_atom_setsym(&a_arr[0], _jit_sym_char);					// set to be the default
-	jit_atom_setsym(&a_arr[1], _jit_sym_long);
-	jit_object_method(output,_jit_sym_types,2,a_arr);
-*/
+	jit_atom_setsym(&a_arr[0], _jit_sym_long);					// set to be the default
+	jit_atom_setsym(&a_arr[1], _jit_sym_float32);
+	jit_atom_setsym(&a_arr[2], _jit_sym_float64);
+	jit_object_method(output,_jit_sym_types,3,a_arr);
 #endif
 
-#ifdef IR_GEN_INDEX
-	jit_mop_output_nolink(mop, IR_GEN_INDEX + 1);
-	output = jit_object_method(mop,_jit_sym_getoutput, IR_GEN_INDEX + 1);
+#ifdef IRMAP_OUTPUT_INDEX
+	jit_mop_output_nolink(mop, IRMAP_OUTPUT_INDEX + 1);
+	output = jit_object_method(mop,_jit_sym_getoutput, IRMAP_OUTPUT_INDEX + 1);
 	jit_attr_setlong(output,_jit_sym_minplanecount,1);
 	jit_attr_setlong(output,_jit_sym_maxplanecount,1);
 	jit_attr_setlong(output,_jit_sym_mindimcount,2);
@@ -153,9 +148,10 @@ t_jit_openni *jit_openni_new(void)
 		}
 		else
 		{
-			x->pMapMetaData[DEPTH_GEN_INDEX] = (XnMapMetaData *)xnAllocateDepthMetaData();
-			x->pMapMetaData[IMAGE_GEN_INDEX] = (XnMapMetaData *)xnAllocateImageMetaData();
-			x->pMapMetaData[IR_GEN_INDEX] = (XnMapMetaData *)xnAllocateIRMetaData();
+			x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX] = (XnMapMetaData *)xnAllocateDepthMetaData();
+			x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX] = (XnMapMetaData *)xnAllocateImageMetaData();
+			x->pMapMetaData[IRMAP_OUTPUT_INDEX] = (XnMapMetaData *)xnAllocateIRMetaData();
+			x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX] = (XnMapMetaData *)xnAllocateSceneMetaData();
 		}
 	} 
 	LOG_DEBUG("object created");
@@ -170,9 +166,10 @@ void jit_openni_free(t_jit_openni *x)
 	if (x->pContext) nRetVal = xnStopGeneratingAll(x->pContext);
 	CHECK_RC_ERROR_EXIT(nRetVal, "jit_openni_free(): cannot stop all generators");
 
-	xnFreeDepthMetaData((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX]);
-	xnFreeImageMetaData((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX]);
-	xnFreeIRMetaData((XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX]);
+	xnFreeDepthMetaData((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX]);
+	xnFreeImageMetaData((XnImageMetaData *)x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX]);
+	xnFreeIRMetaData((XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX]);
+	xnFreeSceneMetaData((XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX]);
 	if (x->pProductionNodeList) xnNodeInfoListFree(x->pProductionNodeList);
 	x->bHaveValidGeneratorProductionNode = false;
 	LOG_DEBUG("Shutting down OpenNI library");
@@ -184,17 +181,20 @@ void jit_openni_free(t_jit_openni *x)
 t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 {
 	t_jit_err err=JIT_ERR_NONE;
-	long out_savelock[NUM_OPENNI_GENERATORS];
+	long out_savelock[NUM_JITOPENNI_OUTPUTS];
 	t_jit_matrix_info out_minfo;
 	char *out_bp;	// char* so can reference down to a single byte as needed
 	long i, j, dimcount;
-	void *out_matrix[NUM_OPENNI_GENERATORS];
+	void *out_matrix[NUM_JITOPENNI_OUTPUTS];
 	boolean bGotOutMatrices = true;
 	XnStatus nRetVal = XN_STATUS_OK;
+#ifdef _DEBUG
+	XnUInt16 tmpNumUsers;
+#endif
 
 	// get the zeroth index input and output from
 	// the corresponding input and output lists
-	for (i=0;i<NUM_OPENNI_GENERATORS;i++)
+	for (i=0;i<NUM_JITOPENNI_OUTPUTS;i++)
 	{
 		if (!(out_matrix[i] = jit_object_method(outputs,_jit_sym_getindex,i)))
 		{
@@ -207,7 +207,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 	if (x && bGotOutMatrices && x->bHaveValidGeneratorProductionNode)
 	{
 		// lock input and output matrices TODO its possible to move this inside the below i through NUM_OPENNI_GENERATORS iteration if it is not important for all matrices to be locked before any work
-		for (i = 0; i< NUM_OPENNI_GENERATORS; i++)
+		for (i = 0; i< NUM_JITOPENNI_OUTPUTS; i++)
 		{
 			out_savelock[i] = (long) jit_object_method(out_matrix[i],_jit_sym_lock,1);
 		}
@@ -236,54 +236,39 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 #ifdef _DEBUG
 					if (!xnIsDataNew(x->hProductionNode[i])) LOG_WARNING2("generator[%d] No new data", i); //TODO remove this debug once no new data->no new matrix output is implemented
 #endif
-					if (xnIsTypeDerivedFrom(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type, XN_NODE_TYPE_MAP_GENERATOR)) //TODO perhaps make an array during XMLConfig and here do a quick loopup
-					{
+//					if (xnIsTypeDerivedFrom(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type, XN_NODE_TYPE_MAP_GENERATOR)) // TODO perhaps make an array during XMLConfig and here do a quick loopup
+//					{
 						LOG_DEBUG3("generator[%d] pixelformat=%s", i, xnPixelFormatToString(((XnDepthMetaData *)x->pMapMetaData[i])->pMap->PixelFormat));
-						switch(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type)	//TODO without using C++ can I call just one function to update all metadata types?
+						switch(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type)
 						{
 						case XN_NODE_TYPE_DEPTH:
-							xnGetDepthMetaData(x->hProductionNode[i], (XnDepthMetaData *)x->pMapMetaData[i]);
+							xnGetDepthMetaData(x->hProductionNode[i], (XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX]);
+							if (err = changeMatrixOutputGivenMapMetaData(x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX], &out_minfo)) goto out;
 							break;
 						case XN_NODE_TYPE_IMAGE:
-							xnGetImageMetaData(x->hProductionNode[i], (XnImageMetaData *)x->pMapMetaData[i]);
+							xnGetImageMetaData(x->hProductionNode[i], (XnImageMetaData *)x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX]);
+							if (err = changeMatrixOutputGivenMapMetaData(x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX], &out_minfo)) goto out;
 							break;
 						case XN_NODE_TYPE_IR:
-							xnGetIRMetaData(x->hProductionNode[i], (XnIRMetaData *)x->pMapMetaData[i]);
+							xnGetIRMetaData(x->hProductionNode[i], (XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX]);
+							if (err = changeMatrixOutputGivenMapMetaData(x->pMapMetaData[IRMAP_OUTPUT_INDEX], &out_minfo)) goto out;
+							break;
+						case XN_NODE_TYPE_USER:
+							xnGetUserPixels(x->hProductionNode[i], 0, (XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX]);
+							if (err = changeMatrixOutputGivenMapMetaData(x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX], &out_minfo)) goto out;
+#ifdef _DEBUG
+							tmpNumUsers = MAX_NUM_USERS_SUPPORTED;
+							xnGetUsers(x->hProductionNode[i], x->aUserIDs, &tmpNumUsers);
+							LOG_DEBUG2("Current num of users=%d", tmpNumUsers);
+							for (j=0; j<tmpNumUsers; j++)
+							{
+								LOG_DEBUG3("user[%d]=%d", j, x->aUserIDs[j]);
+							}
+#endif
 						}
 						LOG_DEBUG("updated metadata for incoming map generator frame");
-						LOG_DEBUG3("generator[%d] gotNew=%s", i, ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->bIsNew ? "true":"false"); // TODO remove this, output should match LOG_WARNING above
+						LOG_DEBUG3("generator[%d] gotNew=%s", i, ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->bIsNew ? "true":"false"); // TODO remove this, output should match LOG_WARNING2 above
 
-						// setup the outputs to support the map's PixelFormat
-						switch(((XnDepthMetaData *)x->pMapMetaData[i])->pMap->PixelFormat)
-						{
-							case XN_PIXEL_FORMAT_RGB24:
-								out_minfo.type = _jit_sym_char;
-								out_minfo.planecount = 4;
-								out_minfo.dim[0] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.X;
-								out_minfo.dim[1] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.Y;
-								break;
-							case XN_PIXEL_FORMAT_YUV422:
-								out_minfo.type = _jit_sym_char;
-								out_minfo.planecount = 4;
-								out_minfo.dim[0] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.X / 2;	// trusting that X res will always be an even number
-								out_minfo.dim[1] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.Y;
-								break;
-							case XN_PIXEL_FORMAT_GRAYSCALE_8_BIT:
-								out_minfo.type = _jit_sym_char;
-								out_minfo.planecount = 1;
-								out_minfo.dim[0] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.X;
-								out_minfo.dim[1] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.Y;
-								break;
-							case XN_PIXEL_FORMAT_GRAYSCALE_16_BIT:
-								out_minfo.planecount = 1;
-								out_minfo.dim[0] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.X;
-								out_minfo.dim[1] = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->FullRes.Y;
-								break;
-							default:
-								LOG_ERROR2("Unsupported PixelFormat", xnPixelFormatToString(((XnDepthMetaData *)x->pMapMetaData[i])->pMap->PixelFormat));
-								err=JIT_ERR_MISMATCH_TYPE;
-								goto out;
-						}
 						jit_object_method(out_matrix[i], _jit_sym_setinfo, &out_minfo);
 						jit_object_method(out_matrix[i], _jit_sym_getinfo, &out_minfo);	// BUGBU for some reason, I have to call this or Max crashes when you change matrix attributes via inspector
 	#ifdef _DEBUG
@@ -304,13 +289,13 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 						// manually copy OpenNI arrays to jitter matrix because jitter doesn't directly support them
 						// by using the Jitter parallel functions
 						jit_parallel_ndim_simplecalc1((method)jit_openni_calculate_ndim, x->pMapMetaData[i], out_minfo.dimcount, out_minfo.dim, out_minfo.planecount, &out_minfo, out_bp, 0);
-					}
+//					}
 				}
 			}
 		}
 out:
 		// restore matrix lock state to previous value
-		for (i = 0; i< NUM_OPENNI_GENERATORS; i++)
+		for (i = 0; i< NUM_JITOPENNI_OUTPUTS; i++)
 		{
 			jit_object_method(out_matrix[i],_jit_sym_lock,out_savelock[i]);
 		}
@@ -320,6 +305,40 @@ out:
 		return JIT_ERR_INVALID_OUTPUT;
 	}
 	return err;
+}
+
+t_jit_err changeMatrixOutputGivenMapMetaData(void *pMetaData, t_jit_matrix_info *pMatrixOut)
+{
+	// setup the outputs to support the map's PixelFormat, assumes 1st parameter of XnDepthMetaData is superset of all map metadatas
+	switch(((XnDepthMetaData *)pMetaData)->pMap->PixelFormat)
+	{
+		case XN_PIXEL_FORMAT_RGB24:
+			pMatrixOut->type = _jit_sym_char;
+			pMatrixOut->planecount = 4;
+			pMatrixOut->dim[0] = ((XnDepthMetaData *)pMetaData)->pMap->FullRes.X;
+			pMatrixOut->dim[1] = ((XnDepthMetaData *)pMetaData)->pMap->FullRes.Y;
+			break;
+		case XN_PIXEL_FORMAT_YUV422:
+			pMatrixOut->type = _jit_sym_char;
+			pMatrixOut->planecount = 4;
+			pMatrixOut->dim[0] = ((XnDepthMetaData *)pMetaData)->pMap->FullRes.X / 2;	// trusting that X res will always be an even number
+			pMatrixOut->dim[1] = ((XnDepthMetaData *)pMetaData)->pMap->FullRes.Y;
+			break;
+		case XN_PIXEL_FORMAT_GRAYSCALE_8_BIT:
+			pMatrixOut->type = _jit_sym_char;
+			pMatrixOut->planecount = 1;
+			pMatrixOut->dim[0] = ((XnDepthMetaData *)pMetaData)->pMap->FullRes.X;
+			pMatrixOut->dim[1] = ((XnDepthMetaData *)pMetaData)->pMap->FullRes.Y;
+			break;
+		case XN_PIXEL_FORMAT_GRAYSCALE_16_BIT:
+			pMatrixOut->planecount = 1;
+			pMatrixOut->dim[0] = ((XnDepthMetaData *)pMetaData)->pMap->FullRes.X;
+			pMatrixOut->dim[1] = ((XnDepthMetaData *)pMetaData)->pMap->FullRes.Y;
+			break;
+		default:
+			return JIT_ERR_MISMATCH_TYPE;
+	}
+	return JIT_ERR_NONE;
 }
 
 void copy16BitDatatoJitterMatrix(XnDepthMetaData *pMapMetaData, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, long rowOffset)
@@ -411,7 +430,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s)
 	nRetVal = xnStopGeneratingAll(x->pContext);		// should stop generators in case we are loading a new XML file
 	CHECK_RC_ERROR_EXIT(nRetVal, "jit_openni_init_from_xml: cannot stop all generators before loading XML config");
 
-	nRetVal = xnContextRunXmlScriptFromFile(x->pContext, s->s_name, pErrors);	// TODO this doesn't seem to support loading a 2nd XML file
+	nRetVal = xnContextRunXmlScriptFromFile(x->pContext, s->s_name, pErrors);	// BUGBUG this doesn't seem to support loading a 2nd XML file
 																				// may need to iterate xnProductionNodeRelease() or xnShutdown()
 	if (nRetVal == XN_STATUS_NO_NODE_PRESENT)
 	{
@@ -436,24 +455,30 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s)
 		LOG_DEBUG2("found prodnode type=%s", xnProductionNodeTypeToString(xnNodeInfoGetDescription(pProdNodeInfo)->Type));
 		LOG_DEBUG2("Derived from map=%s", xnIsTypeDerivedFrom(xnNodeInfoGetDescription(pProdNodeInfo)->Type, XN_NODE_TYPE_MAP_GENERATOR) ? "true":"false");
 
-		x->bHaveValidGeneratorProductionNode = x->bHaveValidGeneratorProductionNode || xnIsTypeGenerator(xnNodeInfoGetDescription(pProdNodeInfo)->Type);
 		switch(xnNodeInfoGetDescription(pProdNodeInfo)->Type)
 		{
+		case XN_NODE_TYPE_DEVICE:
+			break;
 		case XN_NODE_TYPE_DEPTH:
 			x->hProductionNode[DEPTH_GEN_INDEX] = xnNodeInfoGetHandle(pProdNodeInfo);
-			xnGetDepthMetaData(x->hProductionNode[DEPTH_GEN_INDEX], (XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX]);
+			xnGetDepthMetaData(x->hProductionNode[DEPTH_GEN_INDEX], (XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX]);
+			x->bHaveValidGeneratorProductionNode = true;
 			break;
 		case XN_NODE_TYPE_IMAGE:
 			x->hProductionNode[IMAGE_GEN_INDEX] = xnNodeInfoGetHandle(pProdNodeInfo);
-			xnGetImageMetaData(x->hProductionNode[IMAGE_GEN_INDEX], (XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX]);
+			xnGetImageMetaData(x->hProductionNode[IMAGE_GEN_INDEX], (XnImageMetaData *)x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX]);
+			x->bHaveValidGeneratorProductionNode = true;
 			break;
 		case XN_NODE_TYPE_IR:
 			x->hProductionNode[IR_GEN_INDEX] = xnNodeInfoGetHandle(pProdNodeInfo);
-			xnGetIRMetaData(x->hProductionNode[IR_GEN_INDEX], (XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX]);
+			xnGetIRMetaData(x->hProductionNode[IR_GEN_INDEX], (XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX]);
+			x->bHaveValidGeneratorProductionNode = true;
 			break;
 		case XN_NODE_TYPE_USER:
 			x->hProductionNode[USER_GEN_INDEX] = xnNodeInfoGetHandle(pProdNodeInfo);
 			xnRegisterUserCallbacks(x->hProductionNode[USER_GEN_INDEX], User_NewUser, User_LostUser, x, &(x->hUserCallbacks));
+			xnGetUserPixels(x->hProductionNode[USER_GEN_INDEX], 0, (XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX]);
+			x->bHaveValidGeneratorProductionNode = true;
 
 			// check for then setup skeleton support
 			if (xnIsCapabilitySupported(x->hProductionNode[USER_GEN_INDEX], XN_CAPABILITY_SKELETON))
@@ -481,6 +506,9 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s)
 				LOG_DEBUG("User generator doesn't support skeleton");
 				// TODO consider user generator output other than a skeleton
 			}
+			break;
+		default:
+			LOG_ERROR2("found unsupported node type", xnProductionNodeTypeToString(xnNodeInfoGetDescription(pProdNodeInfo)->Type));
 		}
 	}
 	LOG_DEBUG2("bHaveValidGeneratorProductionNode=%d", x->bHaveValidGeneratorProductionNode);
@@ -493,26 +521,33 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s)
 	{
 		XnMapOutputMode *depthMapModes;
 		XnUInt32 i, numDepthMapModes = xnGetSupportedMapOutputModesCount(x->hProductionNode[DEPTH_GEN_INDEX]);
-		depthMapModes = (XnMapOutputMode *)malloc(sizeof(XnMapOutputMode) * numDepthMapModes);
-		xnGetSupportedMapOutputModes(x->hProductionNode[DEPTH_GEN_INDEX], depthMapModes, &numDepthMapModes);
-		LOG_DEBUG2("== %lu Depth modes avail==", numDepthMapModes);
-		for (i=0; i<numDepthMapModes; i++)
+		if (depthMapModes = (XnMapOutputMode *)sysmem_newptr(sizeof(XnMapOutputMode) * numDepthMapModes))
 		{
-			object_post((t_object*)x, "FPS=%lu X=%lu Y=%lu Z=%u", depthMapModes[i].nFPS, depthMapModes[i].nXRes, depthMapModes[i].nYRes, xnGetDeviceMaxDepth(x->hProductionNode[DEPTH_GEN_INDEX]));
+			xnGetSupportedMapOutputModes(x->hProductionNode[DEPTH_GEN_INDEX], depthMapModes, &numDepthMapModes);
+			LOG_DEBUG2("== %lu Depth modes avail==", numDepthMapModes);
+			for (i=0; i<numDepthMapModes; i++)
+			{
+				object_post((t_object*)x, "FPS=%lu X=%lu Y=%lu Z=%u", depthMapModes[i].nFPS, depthMapModes[i].nXRes, depthMapModes[i].nYRes, xnGetDeviceMaxDepth(x->hProductionNode[DEPTH_GEN_INDEX]));
+			}
+			sysmem_freeptr(depthMapModes);
 		}
+
 	}
 
 	if (x->hProductionNode[IMAGE_GEN_INDEX])
 	{
 		XnMapOutputMode *imageMapModes;
 		XnUInt32 i, numImageMapModes = xnGetSupportedMapOutputModesCount(x->hProductionNode[IMAGE_GEN_INDEX]);
-		imageMapModes = (XnMapOutputMode *)malloc(sizeof(XnMapOutputMode) * numImageMapModes);
-		xnGetSupportedMapOutputModes(x->hProductionNode[IMAGE_GEN_INDEX], imageMapModes, &numImageMapModes);
-		LOG_DEBUG2("== %lu Image modes avail==", numImageMapModes);
-		for (i=0; i<numImageMapModes; i++)
+		if (imageMapModes = (XnMapOutputMode *)sysmem_newptr(sizeof(XnMapOutputMode) * numImageMapModes))
 		{
-			object_post((t_object*)x, "FPS=%lu X=%lu Y=%lu", imageMapModes[i].nFPS, imageMapModes[i].nXRes, imageMapModes[i].nYRes);
-		}	
+			xnGetSupportedMapOutputModes(x->hProductionNode[IMAGE_GEN_INDEX], imageMapModes, &numImageMapModes);
+			LOG_DEBUG2("== %lu Image modes avail==", numImageMapModes);
+			for (i=0; i<numImageMapModes; i++)
+			{
+				object_post((t_object*)x, "FPS=%lu X=%lu Y=%lu", imageMapModes[i].nFPS, imageMapModes[i].nXRes, imageMapModes[i].nYRes);
+			}
+			sysmem_freeptr(imageMapModes);
+		}
 	}
 
 	if (x->hProductionNode[USER_GEN_INDEX])
@@ -532,32 +567,39 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s)
 	{
 		XnMapOutputMode *IrMapModes;
 		XnUInt32 i, numIrMapModes = xnGetSupportedMapOutputModesCount(x->hProductionNode[IR_GEN_INDEX]);
-		IrMapModes = (XnMapOutputMode *)malloc(sizeof(XnMapOutputMode) * numIrMapModes);
-		xnGetSupportedMapOutputModes(x->hProductionNode[IR_GEN_INDEX], IrMapModes, &numIrMapModes);
-		LOG_DEBUG2("== %lu IR modes avail==", numIrMapModes);
-		for (i=0; i<numIrMapModes; i++)
+		if (IrMapModes = (XnMapOutputMode *)sysmem_newptr(sizeof(XnMapOutputMode) * numIrMapModes))
 		{
-			object_post((t_object*)x, "FPS=%lu X=%lu Y=%lu", IrMapModes[i].nFPS, IrMapModes[i].nXRes, IrMapModes[i].nYRes);
-		}	
+			xnGetSupportedMapOutputModes(x->hProductionNode[IR_GEN_INDEX], IrMapModes, &numIrMapModes);
+			LOG_DEBUG2("== %lu IR modes avail==", numIrMapModes);
+			for (i=0; i<numIrMapModes; i++)
+			{
+				object_post((t_object*)x, "FPS=%lu X=%lu Y=%lu", IrMapModes[i].nFPS, IrMapModes[i].nXRes, IrMapModes[i].nYRes);
+			}
+			sysmem_freeptr(IrMapModes);
+		}
 	}
 
 	object_post((t_object*)x, "==Current active modes==");
 	if (x->hProductionNode[DEPTH_GEN_INDEX])
 	{
-		object_post((t_object*)x, "DepthMD FPS=%lu FullX=%lu FullY=%lu Z=%u", ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->nFPS, ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->FullRes.X, ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->FullRes.Y, ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->nZRes);
-		object_post((t_object*)x, "DepthMD OffsetX=%lu OffsetY=%lu CropX=%lu CropY=%lu", ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->Offset.X, ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->Offset.Y, ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->Res.X, ((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->Res.Y);
-		object_post((t_object*)x, "DepthMD PixelFormat=%s", xnPixelFormatToString(((XnDepthMetaData *)x->pMapMetaData[DEPTH_GEN_INDEX])->pMap->PixelFormat));
+		object_post((t_object*)x, "DepthMD FPS=%lu FullX=%lu FullY=%lu Z=%u", ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->nFPS, ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->FullRes.X, ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->FullRes.Y, ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->nZRes);
+		object_post((t_object*)x, "DepthMD OffsetX=%lu OffsetY=%lu CropX=%lu CropY=%lu", ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->Offset.X, ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->Offset.Y, ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->Res.X, ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->Res.Y);
+		object_post((t_object*)x, "DepthMD PixelFormat=%s", xnPixelFormatToString(((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->PixelFormat));
 	}
 	if (x->hProductionNode[IMAGE_GEN_INDEX])
 	{
-		object_post((t_object*)x, "ImageMD FPS=%lu X=%lu Y=%lu", ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->nFPS, ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->FullRes.X, ((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->FullRes.Y);
-		object_post((t_object*)x, "ImageMD PixelFormat=%s", xnPixelFormatToString(((XnImageMetaData *)x->pMapMetaData[IMAGE_GEN_INDEX])->pMap->PixelFormat));
+		object_post((t_object*)x, "ImageMD FPS=%lu X=%lu Y=%lu", ((XnImageMetaData *)x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX])->pMap->nFPS, ((XnImageMetaData *)x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX])->pMap->FullRes.X, ((XnImageMetaData *)x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX])->pMap->FullRes.Y);
+		object_post((t_object*)x, "ImageMD PixelFormat=%s", xnPixelFormatToString(((XnImageMetaData *)x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX])->pMap->PixelFormat));
 	}
-	// TODO something for USER generator	
+	if (x->hProductionNode[USER_GEN_INDEX])
+	{
+		object_post((t_object*)x, "UserPixelMD FPS=%lu X=%lu Y=%lu", ((XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX])->pMap->nFPS, ((XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX])->pMap->FullRes.X, ((XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX])->pMap->FullRes.Y);
+		object_post((t_object*)x, "UserPixelMD PixelFormat=%s", xnPixelFormatToString(((XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX])->pMap->PixelFormat));
+	}
 	if (x->hProductionNode[IR_GEN_INDEX])
 	{
-		object_post((t_object*)x, "IrMD FPS=%lu X=%lu Y=%lu", ((XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX])->pMap->nFPS, ((XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX])->pMap->FullRes.X, ((XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX])->pMap->FullRes.Y);
-		object_post((t_object*)x, "IrMD PixelFormat=%s", xnPixelFormatToString(((XnIRMetaData *)x->pMapMetaData[IR_GEN_INDEX])->pMap->PixelFormat));
+		object_post((t_object*)x, "IrMD FPS=%lu X=%lu Y=%lu", ((XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX])->pMap->nFPS, ((XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX])->pMap->FullRes.X, ((XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX])->pMap->FullRes.Y);
+		object_post((t_object*)x, "IrMD PixelFormat=%s", xnPixelFormatToString(((XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX])->pMap->PixelFormat));
 	}
 #endif
 
@@ -567,7 +609,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s)
 // Callback: New user was detected
 void __stdcall User_NewUser(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x)
 {
-	LOG_DEBUG2("New User %d\n", userID);	// TODO is the needed x pointer geting passed and this output occurring?
+	LOG_DEBUG2("New User %d\n", userID);
 	// New user found
 	if (x->bNeedPose)
 	{
