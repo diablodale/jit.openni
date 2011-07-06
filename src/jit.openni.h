@@ -45,19 +45,23 @@
 // Macros
 //---------------------------------------------------------------------------
 
-#define JIT_OPENNI_VERSION "v0.5.0"
-#define MAX_NUM_USERS_SUPPORTED 15	// I have not found an OpenNI API to determine the max number possible
+#define JIT_OPENNI_VERSION "v0.5.1"
+#define MAX_NUM_USERS_SUPPORTED 15		// I have not found an OpenNI API to determine the max number possible for user generators
+#define NUM_OF_SKELETON_JOINT_TYPES 24	// I have not found an OpenNI API to determine the number of joints types (head, left foot, etc.) for a user generator
 #define NUM_OPENNI_GENERATORS 4
-#define DEPTH_GEN_INDEX 0	// BUGBUG currently all map generators MUST be first in order
+#define DEPTH_GEN_INDEX 0
 #define IMAGE_GEN_INDEX 1
 #define IR_GEN_INDEX 2
 #define USER_GEN_INDEX 3
 
-#define NUM_OPENNI_MAPS 4
-#define DEPTHMAP_OUTPUT_INDEX 0	// BUGBUG currently all map generators MUST be first in order
+#define NUM_OPENNI_MAPS 4		// total number of matrices outputs derived from OpenNI maps
+#define DEPTHMAP_OUTPUT_INDEX 0	// currently all map generators MUST be first in order
 #define IMAGEMAP_OUTPUT_INDEX 1
 #define IRMAP_OUTPUT_INDEX 2
 #define USERPIXELMAP_OUTPUT_INDEX 3
+
+#define NUM_OPENNI_MISC_OUTPUTS 1	// this should be number of outputs that are not matrices from OpenNI maps and not dumpout (e.g. skeleton output)
+#define SKELETON_OUTPUT_INDEX 4
 
 #define DEPTHMAP_ASSIST_TEXT "depthmap"	// if adding or removing assist text definitions, update max_jit_openni_assist() in max.jit.openni.c
 #define IMAGEMAP_ASSIST_TEXT "imagemap"
@@ -65,7 +69,7 @@
 #define USERPIXELMAP_ASSIST_TEXT "userpixelsmap"
 
 
-#define NUM_JITOPENNI_OUTPUTS (NUM_OPENNI_MAPS)	// this is the total number of outputs on the jit.open external not counting dumpout.
+#define NUM_JITOPENNI_OUTPUTS (NUM_OPENNI_MAPS + NUM_OPENNI_MISC_OUTPUTS)	// this is the total number of outputs on the jit.open external not counting dumpout.
 
 
 #define MAKEULONGFROMCHARS(a, b, c, d) ((unsigned long)((unsigned long)a | ((unsigned long)b << 8) | ((unsigned long)c << 16) | ((unsigned long)d << 24)))
@@ -138,6 +142,18 @@ typedef struct _max_jit_openni {
 	void		*obex;
 } t_max_jit_openni;
 
+/*
+joint data types from OpenNI:
+	int userid
+	int jointname (enum)
+	float position (x, y, z, confidence)
+	float orientation (3x3 xyz stuff, confidence)
+*/
+
+typedef struct user_and_joints {
+	XnUserID userID;
+	XnSkeletonJointTransformation jointTransform[NUM_OF_SKELETON_JOINT_TYPES];
+} t_user_and_joints;
 
 // Our Jitter object instance data
 typedef struct _jit_openni {
@@ -145,12 +161,15 @@ typedef struct _jit_openni {
 	XnContext* pContext;
 	XnNodeHandle hProductionNode[NUM_OPENNI_GENERATORS]; // this only holds production node GENERATORS!
 	XnNodeInfoList* pProductionNodeList;
-	boolean bHaveValidGeneratorProductionNode;
+	boolean bHaveValidGeneratorProductionNode, bNeedPose, bHaveSkeletonSupport;
 	XnMapMetaData *pMapMetaData[NUM_OPENNI_MAPS];
 	XnUserID aUserIDs[MAX_NUM_USERS_SUPPORTED];
 	XnCallbackHandle hUserCallbacks, hCalibrationCallbacks, hPoseCallbacks;
-	XnBool bNeedPose;
 	XnChar strRequiredCalibrationPose[XN_MAX_NAME_LENGTH];
+	float fJointConfidenceFilter, fOrientConfidenceFilter, fSkeletonSmoothingFactor;
+	char bOutputSkeletonOrientation;
+	short iNumUserSkeletonJoints;
+	t_user_and_joints *pUserSkeletonJoints;
 } t_jit_openni;
 
 

@@ -62,8 +62,8 @@ int main(void)
 	// look up the Jitter class in the class registry
 	q = jit_class_findbyname(gensym("jit_openni"));    
     
-	// add default methods and attributes for MOP max wrapper class
-	max_jit_classex_mop_wrap(p, q, MAX_JIT_MOP_FLAGS_OWN_OUTPUTMATRIX|MAX_JIT_MOP_FLAGS_OWN_JIT_MATRIX|MAX_JIT_MOP_FLAGS_OWN_ADAPT); // attrs & methods for name, type, dim, planecount, bang, outputmatrix, etc
+	// add default methods and attributes for MOP max wrapper class, e.g. name, type, dim, planecount, bang, outputmatrix, etc
+	max_jit_classex_mop_wrap(p, q, MAX_JIT_MOP_FLAGS_OWN_OUTPUTMATRIX|MAX_JIT_MOP_FLAGS_OWN_JIT_MATRIX|MAX_JIT_MOP_FLAGS_OWN_ADAPT);
 
 	// wrap the Jitter class with the standard methods for Jitter objects, e.g. getattributes, dumpout, maxjitclassaddmethods, etc
 	max_jit_classex_standard_wrap(p, q, 0);
