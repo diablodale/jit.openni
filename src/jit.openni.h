@@ -45,7 +45,7 @@
 // Macros
 //---------------------------------------------------------------------------
 
-#define JIT_OPENNI_VERSION "v0.5.1"
+#define JIT_OPENNI_VERSION "v0.6.0"
 #define MAX_NUM_USERS_SUPPORTED 15		// I have not found an OpenNI API to determine the max number possible for user generators
 #define NUM_OF_SKELETON_JOINT_TYPES 24	// I have not found an OpenNI API to determine the number of joints types (head, left foot, etc.) for a user generator
 #define NUM_OPENNI_GENERATORS 4
@@ -61,12 +61,13 @@
 #define USERPIXELMAP_OUTPUT_INDEX 3
 
 #define NUM_OPENNI_MISC_OUTPUTS 1	// this should be number of outputs that are not matrices from OpenNI maps and not dumpout (e.g. skeleton output)
-#define SKELETON_OUTPUT_INDEX 4
+#define SKELETON_OUTPUT_INDEX 5
 
-#define DEPTHMAP_ASSIST_TEXT "depthmap"	// if adding or removing assist text definitions, update max_jit_openni_assist() in max.jit.openni.c
-#define IMAGEMAP_ASSIST_TEXT "imagemap"
-#define IRMAP_ASSIST_TEXT "irmap"
-#define USERPIXELMAP_ASSIST_TEXT "userpixelsmap"
+#define DEPTHMAP_ASSIST_TEXT "(matrix) depthmap generator"	// if adding or removing assist text definitions, update max_jit_openni_assist() in max.jit.openni.c
+#define IMAGEMAP_ASSIST_TEXT "(matrix) imagemap generator"
+#define IRMAP_ASSIST_TEXT "(matrix) irmap generator"
+#define USERPIXELMAP_ASSIST_TEXT "(matrix) userpixelsmap generator"
+#define SKELETON_ASSIST_TEXT "(OSC) skeletons"
 
 
 #define NUM_JITOPENNI_OUTPUTS (NUM_OPENNI_MAPS + NUM_OPENNI_MISC_OUTPUTS)	// this is the total number of outputs on the jit.open external not counting dumpout.
@@ -92,6 +93,11 @@
 #define LOG_WARNING2(what, param1)											\
 	{																		\
 		object_warn((t_object*)x, what, param1);							\
+	}
+
+#define LOG_WARNING3(what, param1, param2)											\
+	{																		\
+		object_warn((t_object*)x, what, param1, param2);					\
 	}
 
 #define LOG_WARNING_RC(rc, what)											\
@@ -166,7 +172,7 @@ typedef struct _jit_openni {
 	XnUserID aUserIDs[MAX_NUM_USERS_SUPPORTED];
 	XnCallbackHandle hUserCallbacks, hCalibrationCallbacks, hPoseCallbacks;
 	XnChar strRequiredCalibrationPose[XN_MAX_NAME_LENGTH];
-	float fJointConfidenceFilter, fOrientConfidenceFilter, fSkeletonSmoothingFactor;
+	float fPositionConfidenceFilter, fOrientConfidenceFilter, fSkeletonSmoothingFactor;
 	char bOutputSkeletonOrientation;
 	short iNumUserSkeletonJoints;
 	t_user_and_joints *pUserSkeletonJoints;

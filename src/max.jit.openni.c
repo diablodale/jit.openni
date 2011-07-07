@@ -39,6 +39,13 @@
 
 // globals
 static void	*max_jit_openni_class = NULL;
+static char *strJointNames[] = { NULL,
+	"head", "neck", "torso", "waist",
+	"l_collar", "l_shoulder", "l_elbow", "l_wrist", "l_hand", "l_fingertip",
+	"r_collar", "r_shoulder", "r_elbow", "r_wrist", "r_hand", "r_fingertip",
+	"l_hip", "l_knee", "l_ankle", "l_foot",
+	"r_hip", "r_knee", "r_ankle", "r_foot"};
+#define MAX_LENGTH_STR_JOINT_NAME 11
 
 
 /************************************************************************************/
@@ -93,7 +100,9 @@ void *max_jit_openni_new(t_symbol *s, long argc, t_atom *argv)
 		o = jit_object_new(gensym("jit_openni"));	// instantiate jit.openni jitter object
 		if (o)
 		{
+			object_obex_store(x, gensym("_openni_osc_outlet"), (t_object *)outlet_new(x, NULL));	// BUGBUG this causes it to be rightmost, I would prefer dumpout to be rightmost
 			max_jit_mop_setup_simple(x, o, argc, argv);	// handle standard MOP max wrapper setup tasks
+
 			max_jit_attr_args(x, argc, argv); // process attribute arguments, like auto handling of @attribute's
 #ifdef _DEBUG
 			for (i = 0; i < argc; i++)
@@ -140,7 +149,7 @@ void max_jit_openni_free(t_max_jit_openni *x)
 
 void max_jit_openni_assist(t_max_jit_openni *x, void *b, long io, long index, char *s)
 {
-	t_jit_openni *pJit_OpenNI = max_jit_obex_jitob_get(x);
+	t_jit_openni *pJit_OpenNI = (t_jit_openni *)max_jit_obex_jitob_get(x);
 
 	// I acknowledge the code below is redundant
 	switch (io)
@@ -153,18 +162,21 @@ void max_jit_openni_assist(t_max_jit_openni *x, void *b, long io, long index, ch
 			{
 			//if (pJit_OpenNI->hProductionNode[index]) snprintf_zero(s, 512, "(matrix) %s generator out%d", xnProductionNodeTypeToString(xnNodeInfoGetDescription(xnGetNodeInfo(pJit_OpenNI->hProductionNode[index]))->Type), index+1);
 			case DEPTHMAP_OUTPUT_INDEX:
-				snprintf_zero(s, 512, "(matrix) %s generator out%d", DEPTHMAP_ASSIST_TEXT, index+1);
+				snprintf_zero(s, 512, "%s out%d", DEPTHMAP_ASSIST_TEXT, index+1);
 				break;
 			case IMAGEMAP_OUTPUT_INDEX:
-				snprintf_zero(s, 512, "(matrix) %s generator out%d", IMAGEMAP_ASSIST_TEXT, index+1);
+				snprintf_zero(s, 512, "%s out%d", IMAGEMAP_ASSIST_TEXT, index+1);
 				break;
 			case IRMAP_OUTPUT_INDEX:
-				snprintf_zero(s, 512, "(matrix) %s generator out%d", IRMAP_ASSIST_TEXT, index+1);
+				snprintf_zero(s, 512, "%s out%d", IRMAP_ASSIST_TEXT, index+1);
 				break;
 			case USERPIXELMAP_OUTPUT_INDEX:
-				snprintf_zero(s, 512, "(matrix) %s generator out%d", USERPIXELMAP_ASSIST_TEXT, index+1);
+				snprintf_zero(s, 512, "%s out%d", USERPIXELMAP_ASSIST_TEXT, index+1);
 				break;
-			case NUM_JITOPENNI_OUTPUTS:
+			case SKELETON_OUTPUT_INDEX:			// BUGBUG not yet able to inset an outlet between the MOPs and dumpout
+				snprintf_zero(s, 512, "%s out%d", SKELETON_ASSIST_TEXT, index+1);
+				break;
+			case SKELETON_OUTPUT_INDEX - 1:		// BUGBUG should be NUM_JITOPENNI_OUTPUTS however not yet able to inset an outlet between the MOPs and dumpout
 				strncpy_zero(s, "dumpout", 512);
 			}
 	}
@@ -238,11 +250,14 @@ void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 	t_atom a;
 	long outputmode = max_jit_mop_getoutputmode(x);
 	void *mop = max_jit_obex_adornment_get(x,_jit_sym_jit_mop);
+	t_jit_openni *pJit_OpenNI = (t_jit_openni *)max_jit_obex_jitob_get(x);
 	t_jit_err err;	
 	
 	LOG_DEBUG("starting custom outputmatrix()");
 	if (outputmode && mop)
-	{ //always output unless output mode is none
+	{
+		//always output unless output mode is none
+
 		if (outputmode==1)
 		{
 			LOG_DEBUG("about to call matrix_calc from custom outputmatrix");
@@ -254,7 +269,47 @@ void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 			}
 			else
 			{
-				LOG_DEBUG("called matrix_calc(), now calling outputmatrix()");
+				t_atom osc_argv[14];
+				char osc_string[MAX_LENGTH_STR_JOINT_NAME + 5];	// max joint string + 4 "/xx/" + terminating null
+				int i, j, k;
+				void *osc_outlet;
+
+
+				LOG_DEBUG("called matrix_calc()");
+
+				if (err = object_obex_lookup(x, gensym("_openni_osc_outlet"), (t_object **)&osc_outlet))
+				{
+					jit_error_code(x,err); 
+				}
+				else
+				{
+					for (i=0; i<pJit_OpenNI->iNumUserSkeletonJoints; i++)
+					{
+						for (j=1; j<= NUM_OF_SKELETON_JOINT_TYPES; j++)
+						{
+							if (pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.fConfidence >= pJit_OpenNI->fPositionConfidenceFilter &&
+									pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.fConfidence >= pJit_OpenNI->fOrientConfidenceFilter)
+							{
+								snprintf_zero(osc_string, 30, "/%u/%s", pJit_OpenNI->pUserSkeletonJoints->userID, strJointNames[j]);
+								atom_setfloat(osc_argv, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.X);
+								atom_setfloat(osc_argv + 1, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.Y);
+								atom_setfloat(osc_argv + 2, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.Z);
+								atom_setfloat(osc_argv + 3, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.fConfidence);
+								if (pJit_OpenNI->bOutputSkeletonOrientation)
+								{
+									for (k=0; k<9; k++) atom_setfloat(osc_argv + 4 + k, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.orientation.elements[k]);
+									atom_setfloat(osc_argv + 13, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.fConfidence);
+									outlet_anything(osc_outlet, gensym(osc_string), 14, osc_argv);
+								}
+								else
+								{
+									outlet_anything(osc_outlet, gensym(osc_string), 4, osc_argv);
+								}
+							}
+						}
+					}
+				}
+				LOG_DEBUG("now calling outputmatrix()");
 				max_jit_mop_outputmatrix(x);
 				LOG_DEBUG("called outputmatrix()");
 			}

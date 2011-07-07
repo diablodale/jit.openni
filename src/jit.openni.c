@@ -118,8 +118,8 @@ t_jit_err jit_openni_init(void)
 	jit_class_addmethod(s_jit_openni_class, (method)jit_openni_init_from_xml, "init_from_xml", A_SYM, 0);
 
 	// add attribute(s)
-	attr = jit_object_new(_jit_sym_jit_attr_offset, "joint_confidence_filter", _jit_sym_float32, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW,
-			NULL, NULL, calcoffset(t_jit_openni, fJointConfidenceFilter));
+	attr = jit_object_new(_jit_sym_jit_attr_offset, "position_confidence_filter", _jit_sym_float32, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW,
+			NULL, NULL, calcoffset(t_jit_openni, fPositionConfidenceFilter));
 	jit_class_addattr(s_jit_openni_class, attr);
 	attr = jit_object_new(_jit_sym_jit_attr_offset, "orient_confidence_filter", _jit_sym_float32, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW,
 			NULL, NULL, calcoffset(t_jit_openni, fOrientConfidenceFilter));
@@ -151,10 +151,10 @@ t_jit_openni *jit_openni_new(void)
 		x->bHaveValidGeneratorProductionNode = false;
 		x->bNeedPose = false;
 		x->bHaveSkeletonSupport = false;
-		x->fJointConfidenceFilter = 1.0;
-		x->fOrientConfidenceFilter = 1.0;
+		x->fPositionConfidenceFilter = 0.0;
+		x->fOrientConfidenceFilter = 0.0;
 		x->bOutputSkeletonOrientation = 0;
-		//x->fSkeletonSmoothingFactor = 1.0;	//BUGBUG what is the OpenNI/NITE default?
+		x->fSkeletonSmoothingFactor = 0.0;	//BUGBUG what is the OpenNI/NITE default?
 		x->pUserSkeletonJoints = NULL;
 
 		LOG_DEBUG("Initializing OpenNI library");
@@ -205,9 +205,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 	void *out_matrix[NUM_OPENNI_MAPS];
 	boolean bGotOutMatrices = true;
 	XnStatus nRetVal = XN_STATUS_OK;
-#ifdef _DEBUG
 	XnUInt16 tmpNumUsers;
-#endif
 
 	// get the zeroth index input and output from
 	// the corresponding input and output lists
@@ -277,7 +275,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 						
 						if (x->bHaveSkeletonSupport)
 						{
-							// xnSetSkeletonSmoothing(x->hProductionNode[USER_GEN_INDEX],x->fSkeletonSmoothingFactor); // TODO need to uncomment when understand what the default is
+							xnSetSkeletonSmoothing(x->hProductionNode[USER_GEN_INDEX],x->fSkeletonSmoothingFactor);
 							x->iNumUserSkeletonJoints = 0;
 							for (j=0; j<tmpNumUsers; j++)
 							{
@@ -595,10 +593,10 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s)
 	if (x->hProductionNode[USER_GEN_INDEX])
 	{
 		LOG_DEBUG("== Created user generator ==");
-		if (xnIsCapabilitySupported(x->hProductionNode[USER_GEN_INDEX], XN_CAPABILITY_SKELETON))
+		if (x->bHaveSkeletonSupport)
 		{
 			LOG_DEBUG("Supports skeletons");
-			if (xnNeedPoseForSkeletonCalibration (x->hProductionNode[USER_GEN_INDEX]))
+			if (x->bNeedPose)
 			{
 				LOG_DEBUG("Skeleton needs a pose");
 			}
@@ -651,7 +649,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s)
 // Callback: New user was detected
 void __stdcall User_NewUser(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x)
 {
-	LOG_COMMENT2("New User %d\n", userID);
+	LOG_DEBUG2("New User %d\n", userID);
 	// New user found
 	if (x->bNeedPose)
 	{
@@ -666,13 +664,13 @@ void __stdcall User_NewUser(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_
 // Callback: An existing user was lost
 void __stdcall User_LostUser(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x)
 {
-	LOG_COMMENT2("Lost user %d\n", userID);
+	LOG_DEBUG2("Lost user %d\n", userID);
 }
 
 // Callback: Detected a pose
 void __stdcall UserPose_PoseDetected(XnNodeHandle hPoseCapability, const XnChar *strPose, XnUserID userID, t_jit_openni *x)
 {
-	LOG_COMMENT3("Pose %s detected for user %d\n", strPose, userID);
+	LOG_DEBUG3("Pose %s detected for user %d\n", strPose, userID);
 	xnStopPoseDetection(hPoseCapability, userID);
 	xnRequestSkeletonCalibration(hPoseCapability, userID, true);
 }
@@ -680,7 +678,7 @@ void __stdcall UserPose_PoseDetected(XnNodeHandle hPoseCapability, const XnChar 
 // Callback: Started calibration
 void __stdcall UserCalibration_CalibrationStart(XnNodeHandle hSkeletonCapability, XnUserID userID, t_jit_openni *x)
 {
-	LOG_COMMENT2("Calibration started for user %d", userID);
+	LOG_DEBUG2("Calibration started for user %d", userID);
 }
 
 // Callback: Finished calibration
@@ -689,13 +687,13 @@ void __stdcall UserCalibration_CalibrationEnd(XnNodeHandle hSkeletonCapability, 
 	if (bSuccess)
 	{
 		// Calibration succeeded
-		LOG_COMMENT2("Calibration complete, start tracking user %d", userID);
+		LOG_DEBUG2("Calibration complete, start tracking user %d", userID);
 		xnStartSkeletonTracking(hSkeletonCapability, userID);
 	}
 	else
 	{
 		// Calibration failed
-		LOG_COMMENT2("Calibration failed for user %d", userID);
+		LOG_DEBUG2("Calibration failed for user %d", userID);
 		if (x->bNeedPose)
 		{
 			xnStartPoseDetection(hSkeletonCapability, x->strRequiredCalibrationPose, userID);
