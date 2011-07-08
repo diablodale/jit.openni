@@ -36,6 +36,13 @@ Build notes-----------
 - You will need to change the build's include and library directories to match
   the locations in the Max SDK and OpenNI SDK.
 
+v0.6.1---------
+- fixed ordering of outlets, dumpout is now on the far right
+- updated OSC address pattern format for skeleton joint output to start with "/skel/"
+- added functions in jitter object to register for jit.openni events (e.g. calibration start/end, new users)
+- now output openni events (e.g. calibration start/end, new users)
+- updated jit.openni_test1.maxpat to demonstrate using the OSC output with OSC-route from http://cnmat.berkeley.edu/downloads
+
 v0.6.0---------
 - outputs user skeleton data using OSC format (do not yet output user, pose, or calibration events via OSC)
 - added attributes to filter by confidence, optional output of joint orientation, smoothing of skeleton

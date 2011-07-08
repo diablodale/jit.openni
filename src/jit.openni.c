@@ -49,7 +49,7 @@ t_jit_err jit_openni_init(void)
 	t_atom			a_arr[4];
 	int				i;
 
-	s_jit_openni_class = jit_class_new("jit_openni", (method)jit_openni_new, (method)jit_openni_free, sizeof(t_jit_openni), 0);
+	s_jit_openni_class = jit_class_new("jit_openni", (method)jit_openni_new, (method)jit_openni_free, sizeof(t_jit_openni), A_OBJ, 0);
 
 	// add matrix operator (mop)
 	mop = (t_jit_object*)jit_object_new(_jit_sym_jit_mop, 0, NUM_OPENNI_MAPS); // no matrix inputs, matrix outputs (generator outputs) + default dumpout
@@ -140,7 +140,7 @@ t_jit_err jit_openni_init(void)
 /************************************************************************************/
 // Object Life Cycle
 
-t_jit_openni *jit_openni_new(void)
+t_jit_openni *jit_openni_new(void *pParent)
 {
 	t_jit_openni	*x = NULL;
 	
@@ -148,6 +148,7 @@ t_jit_openni *jit_openni_new(void)
 	if (x)
 	{
 		XnStatus nRetVal = XN_STATUS_OK;
+		x->pParent = pParent;
 		x->bHaveValidGeneratorProductionNode = false;
 		x->bNeedPose = false;
 		x->bHaveSkeletonSupport = false;
@@ -156,6 +157,7 @@ t_jit_openni *jit_openni_new(void)
 		x->bOutputSkeletonOrientation = 0;
 		x->fSkeletonSmoothingFactor = 0.0;	//BUGBUG what is the OpenNI/NITE default?
 		x->pUserSkeletonJoints = NULL;
+		x->pEventCallbackFunctions = (t_jit_linklist *)jit_object_new(_jit_sym_jit_linklist);
 
 		LOG_DEBUG("Initializing OpenNI library");
 		if (nRetVal = xnInit(&(x->pContext)))
@@ -186,6 +188,7 @@ void jit_openni_free(t_jit_openni *x)
 	xnFreeImageMetaData((XnImageMetaData *)x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX]);
 	xnFreeIRMetaData((XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX]);
 	xnFreeSceneMetaData((XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX]);
+	jit_object_free(x->pEventCallbackFunctions);
 	if (x->pUserSkeletonJoints) sysmem_freeptr(x->pUserSkeletonJoints);
 	if (x->pProductionNodeList) xnNodeInfoListFree(x->pProductionNodeList);
 	x->bHaveValidGeneratorProductionNode = false;
@@ -646,10 +649,58 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s)
 }
 // ---------- user and skeleton generator code -----------------
 
-// Callback: New user was detected
-void __stdcall User_NewUser(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x)
+// register to receive callbacks for jit_open object events
+t_jit_err RegisterJitOpenNIEventCallbacks(t_jit_openni *x, JitOpenNIEventHandler funcCallback, void **hUnregister)
 {
-	LOG_DEBUG2("New User %d\n", userID);
+	LOG_DEBUG2("starting size of linklist=%ld", jit_linklist_getsize(x->pEventCallbackFunctions));
+	if ( jit_linklist_append(x->pEventCallbackFunctions, funcCallback) == -1)		// TODO, I want to use jit_linklist_insertindex() here but it crashes on an empty list
+	{
+		return JIT_ERR_OUT_OF_MEM;
+	}
+	else
+	{
+		*hUnregister = jit_linklist_index2ptr(x->pEventCallbackFunctions, jit_linklist_objptr2index(x->pEventCallbackFunctions, funcCallback));
+		LOG_DEBUG3("added regid=%x, ending size of linklist=%ld", *hUnregister, jit_linklist_getsize(x->pEventCallbackFunctions));
+	}
+	return JIT_ERR_NONE;
+}
+
+t_jit_err UnregisterJitOpenNIEventCallbacks(t_jit_openni *x, void *pUnregister)
+{
+	LOG_DEBUG2("unregister: starting size of linklist=%ld", jit_linklist_getsize(x->pEventCallbackFunctions));
+	LOG_DEBUG2("unregister: About to unregister using RegID=%x", pUnregister);
+	if (jit_linklist_chuckptr(x->pEventCallbackFunctions, pUnregister) == -1)
+	{
+		LOG_DEBUG("linklist_delete returned an error");
+		LOG_DEBUG2("unregister: ending size of linklist=%ld", jit_linklist_getsize(x->pEventCallbackFunctions));
+		return JIT_ERR_OUT_OF_BOUNDS;
+	}
+	else
+	{
+		LOG_DEBUG2("unregister: ending size of linklist=%ld", jit_linklist_getsize(x->pEventCallbackFunctions));
+		return JIT_ERR_NONE;
+	}
+}
+
+void makeCallbacks(t_jit_openni *x, enum JitOpenNIEvents iEventType, XnUserID userID)
+{
+	long i;
+	JitOpenNIEventHandler funcCallback;
+
+	for (i=0; i < jit_linklist_getsize(x->pEventCallbackFunctions); i++)	// I call for the size each loop to help catch resizing of list by another thread
+	{
+		if (funcCallback = (JitOpenNIEventHandler)jit_linklist_getindex(x->pEventCallbackFunctions, i))
+		{
+			funcCallback(x, iEventType, userID);
+		}
+	}
+
+}
+
+// Callback: New user was detected
+void XN_CALLBACK_TYPE User_NewUser(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x)
+{
+	makeCallbacks(x, JITOPENNI_NEW_USER, userID);
 	// New user found
 	if (x->bNeedPose)
 	{
@@ -662,38 +713,38 @@ void __stdcall User_NewUser(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_
 }
 
 // Callback: An existing user was lost
-void __stdcall User_LostUser(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x)
+void XN_CALLBACK_TYPE User_LostUser(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x)
 {
-	LOG_DEBUG2("Lost user %d\n", userID);
+	makeCallbacks(x, JITOPENNI_LOST_USER, userID);
 }
 
 // Callback: Detected a pose
-void __stdcall UserPose_PoseDetected(XnNodeHandle hPoseCapability, const XnChar *strPose, XnUserID userID, t_jit_openni *x)
+void XN_CALLBACK_TYPE UserPose_PoseDetected(XnNodeHandle hPoseCapability, const XnChar *strPose, XnUserID userID, t_jit_openni *x)
 {
-	LOG_DEBUG3("Pose %s detected for user %d\n", strPose, userID);
+	makeCallbacks(x, JITOPENNI_CALIB_POSE_DETECTED, userID);
 	xnStopPoseDetection(hPoseCapability, userID);
 	xnRequestSkeletonCalibration(hPoseCapability, userID, true);
 }
 
 // Callback: Started calibration
-void __stdcall UserCalibration_CalibrationStart(XnNodeHandle hSkeletonCapability, XnUserID userID, t_jit_openni *x)
+void XN_CALLBACK_TYPE UserCalibration_CalibrationStart(XnNodeHandle hSkeletonCapability, XnUserID userID, t_jit_openni *x)
 {
-	LOG_DEBUG2("Calibration started for user %d", userID);
+	makeCallbacks(x, JITOPENNI_CALIB_START, userID);
 }
 
 // Callback: Finished calibration
-void __stdcall UserCalibration_CalibrationEnd(XnNodeHandle hSkeletonCapability, XnUserID userID, XnBool bSuccess, t_jit_openni *x)
+void XN_CALLBACK_TYPE UserCalibration_CalibrationEnd(XnNodeHandle hSkeletonCapability, XnUserID userID, XnBool bSuccess, t_jit_openni *x)
 {
 	if (bSuccess)
 	{
 		// Calibration succeeded
-		LOG_DEBUG2("Calibration complete, start tracking user %d", userID);
+		makeCallbacks(x, JITOPENNI_CALIB_SUCCESS, userID);
 		xnStartSkeletonTracking(hSkeletonCapability, userID);
 	}
 	else
 	{
 		// Calibration failed
-		LOG_DEBUG2("Calibration failed for user %d", userID);
+		makeCallbacks(x, JITOPENNI_CALIB_FAIL, userID);
 		if (x->bNeedPose)
 		{
 			xnStartPoseDetection(hSkeletonCapability, x->strRequiredCalibrationPose, userID);

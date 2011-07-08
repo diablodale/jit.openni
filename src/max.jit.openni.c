@@ -45,7 +45,11 @@ static char *strJointNames[] = { NULL,
 	"r_collar", "r_shoulder", "r_elbow", "r_wrist", "r_hand", "r_fingertip",
 	"l_hip", "l_knee", "l_ankle", "l_foot",
 	"r_hip", "r_knee", "r_ankle", "r_foot"};
-#define MAX_LENGTH_STR_JOINT_NAME 11
+#define MAX_LENGTH_STR_JOINT_NAME 11	// always keep the number of characters of the longest string in this group above
+
+// strOSCEvents[] must match the number/order of enum JitOpenNIEvents defined in jit.openni.h
+static char *strOSCEvents[] = { "/new_user", "/lost_user", "/calib_pose",
+	"/calib_start", "/calib_success", "/calib_fail"};
 
 
 /************************************************************************************/
@@ -97,11 +101,18 @@ void *max_jit_openni_new(t_symbol *s, long argc, t_atom *argv)
 	x = (t_max_jit_openni*)max_jit_obex_new(max_jit_openni_class, gensym("jit_openni"));
 	if (x)
 	{
-		o = jit_object_new(gensym("jit_openni"));	// instantiate jit.openni jitter object
+		o = jit_object_new(gensym("jit_openni"), x);	// instantiate jit.openni jitter object
 		if (o)
 		{
-			object_obex_store(x, gensym("_openni_osc_outlet"), (t_object *)outlet_new(x, NULL));	// BUGBUG this causes it to be rightmost, I would prefer dumpout to be rightmost
-			max_jit_mop_setup_simple(x, o, argc, argv);	// handle standard MOP max wrapper setup tasks
+			// typically, max_jit_mop_setup_simple(x, o, argc, argv) is called here to handle standard MOP max wrapper setup tasks
+			// however, I need to create a max only outlet between the MOP outlets and dumpout, so will use the code from MAx SDK 21.6.
+			max_jit_obex_jitob_set(x,o);
+			max_jit_obex_dumpout_set(x,outlet_new(x,NULL));
+			x->osc_outlet = (t_object *)outlet_new(x, NULL);
+			max_jit_mop_setup(x);
+			max_jit_mop_inputs(x);
+			max_jit_mop_outputs(x);
+			max_jit_mop_matrix_args(x,argc,argv);
 
 			max_jit_attr_args(x, argc, argv); // process attribute arguments, like auto handling of @attribute's
 #ifdef _DEBUG
@@ -123,10 +134,22 @@ void *max_jit_openni_new(t_symbol *s, long argc, t_atom *argv)
 				}
 			}
 #endif
-		} 
+			if(RegisterJitOpenNIEventCallbacks((t_jit_openni *)max_jit_obex_jitob_get(x), max_jit_openni_post_events, &(x->pRegistrationForEvents)))
+			{
+				LOG_ERROR("jit.openni: could not register for jit.openni event callbacks");
+				max_jit_openni_free(x);
+				freeobject((t_object*)x);
+				x = NULL;
+			}
+			else
+			{
+				LOG_DEBUG2("jit.openni: successfully registered for jit.openni event callbacks w/ regID=%x", x->pRegistrationForEvents);
+			}
+		}
 		else
 		{
 			LOG_ERROR("jit.openni: could not allocate object");
+			max_jit_obex_free(x);
 			freeobject((t_object*)x);
 			x = NULL;
 		}
@@ -137,6 +160,11 @@ void *max_jit_openni_new(t_symbol *s, long argc, t_atom *argv)
 
 void max_jit_openni_free(t_max_jit_openni *x)
 {
+	if (UnregisterJitOpenNIEventCallbacks((t_jit_openni *)max_jit_obex_jitob_get(x), x->pRegistrationForEvents))
+	{
+		LOG_ERROR("jit.openni: could not unregister for jit.openni event callbacks");
+	}
+	
 	max_jit_mop_free(x);
 	
 	// lookup the internal Jitter object instance and free
@@ -160,7 +188,6 @@ void max_jit_openni_assist(t_max_jit_openni *x, void *b, long io, long index, ch
 		case 2:
 			switch (index)
 			{
-			//if (pJit_OpenNI->hProductionNode[index]) snprintf_zero(s, 512, "(matrix) %s generator out%d", xnProductionNodeTypeToString(xnNodeInfoGetDescription(xnGetNodeInfo(pJit_OpenNI->hProductionNode[index]))->Type), index+1);
 			case DEPTHMAP_OUTPUT_INDEX:
 				snprintf_zero(s, 512, "%s out%d", DEPTHMAP_ASSIST_TEXT, index+1);
 				break;
@@ -173,10 +200,10 @@ void max_jit_openni_assist(t_max_jit_openni *x, void *b, long io, long index, ch
 			case USERPIXELMAP_OUTPUT_INDEX:
 				snprintf_zero(s, 512, "%s out%d", USERPIXELMAP_ASSIST_TEXT, index+1);
 				break;
-			case SKELETON_OUTPUT_INDEX:			// BUGBUG not yet able to inset an outlet between the MOPs and dumpout
+			case SKELETON_OUTPUT_INDEX:
 				snprintf_zero(s, 512, "%s out%d", SKELETON_ASSIST_TEXT, index+1);
 				break;
-			case SKELETON_OUTPUT_INDEX - 1:		// BUGBUG should be NUM_JITOPENNI_OUTPUTS however not yet able to inset an outlet between the MOPs and dumpout
+			case NUM_JITOPENNI_OUTPUTS:
 				strncpy_zero(s, "dumpout", 512);
 			}
 	}
@@ -200,8 +227,7 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 		LOG_ERROR("error getting patcher for jit.openni");
 	mypatcherpath = object_attr_getsym(mypatcher, gensym("filepath"));
 	
-	// BUGBUG if I use _sym_nothing rather than gensym("") then I get linker error LNK2001: unresolved external symbol __common_symbols
-	if ((mypatcherpath) && (mypatcherpath != gensym("")))
+	if ((mypatcherpath) && (mypatcherpath != gensym(""))) 	// if I use _sym_nothing rather than gensym("") then I get linker error LNK2001: unresolved external symbol __common_symbols
 	{
 		LOG_COMMENT2("The patcher path is %s", mypatcherpath->s_name);
 	}
@@ -247,7 +273,6 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 
 void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 {
-	t_atom a;
 	long outputmode = max_jit_mop_getoutputmode(x);
 	void *mop = max_jit_obex_adornment_get(x,_jit_sym_jit_mop);
 	t_jit_openni *pJit_OpenNI = (t_jit_openni *)max_jit_obex_jitob_get(x);
@@ -270,41 +295,31 @@ void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 			else
 			{
 				t_atom osc_argv[14];
-				char osc_string[MAX_LENGTH_STR_JOINT_NAME + 5];	// max joint string + 4 "/xx/" + terminating null
+				char osc_string[MAX_LENGTH_STR_JOINT_NAME + 9];	// max joint string + 9 "/skel/xx/"
 				int i, j, k;
-				void *osc_outlet;
-
 
 				LOG_DEBUG("called matrix_calc()");
-
-				if (err = object_obex_lookup(x, gensym("_openni_osc_outlet"), (t_object **)&osc_outlet))
+				for (i=0; i<pJit_OpenNI->iNumUserSkeletonJoints; i++)
 				{
-					jit_error_code(x,err); 
-				}
-				else
-				{
-					for (i=0; i<pJit_OpenNI->iNumUserSkeletonJoints; i++)
+					for (j=1; j<= NUM_OF_SKELETON_JOINT_TYPES; j++)
 					{
-						for (j=1; j<= NUM_OF_SKELETON_JOINT_TYPES; j++)
+						if (pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.fConfidence >= pJit_OpenNI->fPositionConfidenceFilter &&
+								pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.fConfidence >= pJit_OpenNI->fOrientConfidenceFilter)
 						{
-							if (pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.fConfidence >= pJit_OpenNI->fPositionConfidenceFilter &&
-									pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.fConfidence >= pJit_OpenNI->fOrientConfidenceFilter)
+							snprintf_zero(osc_string, MAX_LENGTH_STR_JOINT_NAME + 9, "/skel/%u/%s", pJit_OpenNI->pUserSkeletonJoints->userID, strJointNames[j]);
+							atom_setfloat(osc_argv, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.X);
+							atom_setfloat(osc_argv + 1, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.Y);
+							atom_setfloat(osc_argv + 2, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.Z);
+							atom_setfloat(osc_argv + 3, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.fConfidence);
+							if (pJit_OpenNI->bOutputSkeletonOrientation)
 							{
-								snprintf_zero(osc_string, 30, "/%u/%s", pJit_OpenNI->pUserSkeletonJoints->userID, strJointNames[j]);
-								atom_setfloat(osc_argv, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.X);
-								atom_setfloat(osc_argv + 1, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.Y);
-								atom_setfloat(osc_argv + 2, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.Z);
-								atom_setfloat(osc_argv + 3, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.fConfidence);
-								if (pJit_OpenNI->bOutputSkeletonOrientation)
-								{
-									for (k=0; k<9; k++) atom_setfloat(osc_argv + 4 + k, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.orientation.elements[k]);
-									atom_setfloat(osc_argv + 13, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.fConfidence);
-									outlet_anything(osc_outlet, gensym(osc_string), 14, osc_argv);
-								}
-								else
-								{
-									outlet_anything(osc_outlet, gensym(osc_string), 4, osc_argv);
-								}
+								for (k=0; k<9; k++) atom_setfloat(osc_argv + 4 + k, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.orientation.elements[k]);
+								atom_setfloat(osc_argv + 13, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.fConfidence);
+								outlet_anything(x->osc_outlet, gensym(osc_string), 14, osc_argv);
+							}
+							else
+							{
+								outlet_anything(x->osc_outlet, gensym(osc_string), 4, osc_argv);
 							}
 						}
 					}
@@ -321,4 +336,12 @@ void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 			LOG_DEBUG("called outputmatrix()");
 		}
 	}	
+}
+
+void max_jit_openni_post_events(t_jit_openni *x, enum JitOpenNIEvents iEventType, XnUserID userID)
+{
+	t_atom osc_argv;
+
+	atom_setlong(&osc_argv, userID);
+	outlet_anything(((t_max_jit_openni *)(x->pParent))->osc_outlet, gensym(strOSCEvents[iEventType]), 1, &osc_argv);
 }

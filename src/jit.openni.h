@@ -45,7 +45,7 @@
 // Macros
 //---------------------------------------------------------------------------
 
-#define JIT_OPENNI_VERSION "v0.6.0"
+#define JIT_OPENNI_VERSION "v0.6.1"
 #define MAX_NUM_USERS_SUPPORTED 15		// I have not found an OpenNI API to determine the max number possible for user generators
 #define NUM_OF_SKELETON_JOINT_TYPES 24	// I have not found an OpenNI API to determine the number of joints types (head, left foot, etc.) for a user generator
 #define NUM_OPENNI_GENERATORS 4
@@ -61,7 +61,7 @@
 #define USERPIXELMAP_OUTPUT_INDEX 3
 
 #define NUM_OPENNI_MISC_OUTPUTS 1	// this should be number of outputs that are not matrices from OpenNI maps and not dumpout (e.g. skeleton output)
-#define SKELETON_OUTPUT_INDEX 5
+#define SKELETON_OUTPUT_INDEX 4
 
 #define DEPTHMAP_ASSIST_TEXT "(matrix) depthmap generator"	// if adding or removing assist text definitions, update max_jit_openni_assist() in max.jit.openni.c
 #define IMAGEMAP_ASSIST_TEXT "(matrix) imagemap generator"
@@ -69,9 +69,7 @@
 #define USERPIXELMAP_ASSIST_TEXT "(matrix) userpixelsmap generator"
 #define SKELETON_ASSIST_TEXT "(OSC) skeletons"
 
-
 #define NUM_JITOPENNI_OUTPUTS (NUM_OPENNI_MAPS + NUM_OPENNI_MISC_OUTPUTS)	// this is the total number of outputs on the jit.open external not counting dumpout.
-
 
 #define MAKEULONGFROMCHARS(a, b, c, d) ((unsigned long)((unsigned long)a | ((unsigned long)b << 8) | ((unsigned long)c << 16) | ((unsigned long)d << 24)))
 
@@ -95,7 +93,7 @@
 		object_warn((t_object*)x, what, param1);							\
 	}
 
-#define LOG_WARNING3(what, param1, param2)											\
+#define LOG_WARNING3(what, param1, param2)									\
 	{																		\
 		object_warn((t_object*)x, what, param1, param2);					\
 	}
@@ -138,7 +136,7 @@
 	}
 
 //---------------------------------------------------------------------------
-// typedefs
+// typedefs and enums
 //---------------------------------------------------------------------------
 
 // Max object instance data
@@ -146,15 +144,18 @@
 typedef struct _max_jit_openni {
 	t_object	ob;
 	void		*obex;
+	t_object	*osc_outlet;
+	void		*pRegistrationForEvents;
 } t_max_jit_openni;
 
-/*
-joint data types from OpenNI:
-	int userid
-	int jointname (enum)
-	float position (x, y, z, confidence)
-	float orientation (3x3 xyz stuff, confidence)
-*/
+// enum JitOpenNIEvents must match the number/order of friendly string array defined in max.jit.openni.c
+enum JitOpenNIEvents {	JITOPENNI_NEW_USER,
+						JITOPENNI_LOST_USER,
+						JITOPENNI_CALIB_POSE_DETECTED,
+						JITOPENNI_CALIB_START,
+						JITOPENNI_CALIB_SUCCESS,
+						JITOPENNI_CALIB_FAIL
+};
 
 typedef struct user_and_joints {
 	XnUserID userID;
@@ -164,9 +165,10 @@ typedef struct user_and_joints {
 // Our Jitter object instance data
 typedef struct _jit_openni {
 	t_object	ob;
-	XnContext* pContext;
+	void *pParent;
+	XnContext *pContext;
 	XnNodeHandle hProductionNode[NUM_OPENNI_GENERATORS]; // this only holds production node GENERATORS!
-	XnNodeInfoList* pProductionNodeList;
+	XnNodeInfoList *pProductionNodeList;
 	boolean bHaveValidGeneratorProductionNode, bNeedPose, bHaveSkeletonSupport;
 	XnMapMetaData *pMapMetaData[NUM_OPENNI_MAPS];
 	XnUserID aUserIDs[MAX_NUM_USERS_SUPPORTED];
@@ -176,8 +178,10 @@ typedef struct _jit_openni {
 	char bOutputSkeletonOrientation;
 	short iNumUserSkeletonJoints;
 	t_user_and_joints *pUserSkeletonJoints;
+	t_jit_linklist *pEventCallbackFunctions;
 } t_jit_openni;
 
+typedef void (* JitOpenNIEventHandler)(t_jit_openni *x, enum JitOpenNIEvents iEventType, XnUserID userID);
 
 //---------------------------------------------------------------------------
 // Prototypes
@@ -185,7 +189,7 @@ typedef struct _jit_openni {
 
 // jit.openni.c
 t_jit_err		jit_openni_init(void); 
-t_jit_openni	*jit_openni_new(void);
+t_jit_openni	*jit_openni_new(void *pParent);
 void			jit_openni_free					(t_jit_openni *x);
 void			jit_openni_init_from_xml		(t_jit_openni *x, t_symbol *s); // TODO should this return a t_jit_err?
 t_jit_err		jit_openni_matrix_calc			(t_jit_openni *x, void *inputs, void *outputs);
@@ -193,11 +197,13 @@ t_jit_err		changeMatrixOutputGivenMapMetaData(void *pMetaData, t_jit_matrix_info
 void			copy16BitDatatoJitterMatrix		(XnDepthMetaData *pMapMetaData, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, long rowOffset);
 void			max_jit_openni_assist			(t_max_jit_openni *x, void *b, long io, long index, char *s);
 void			jit_openni_calculate_ndim		(XnDepthMetaData *pMapMetaData, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, t_jit_parallel_ndim_worker *para_worker);
-void __stdcall	User_NewUser					(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x);
-void __stdcall	User_LostUser					(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x);
-void __stdcall UserPose_PoseDetected	(XnNodeHandle hPoseCapability, const XnChar *strPose, XnUserID userID, t_jit_openni *x);
-void __stdcall UserCalibration_CalibrationStart(XnNodeHandle hSkeletonCapability, XnUserID userID, t_jit_openni *x);
-void __stdcall UserCalibration_CalibrationEnd	(XnNodeHandle hSkeletonCapability, XnUserID userID, XnBool bSuccess, t_jit_openni *x);
+t_jit_err RegisterJitOpenNIEventCallbacks		(t_jit_openni *x, JitOpenNIEventHandler funcCallback, void **pUnregister);
+t_jit_err UnregisterJitOpenNIEventCallbacks		(t_jit_openni *x, void *pUnregister);
+void XN_CALLBACK_TYPE User_NewUser				(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x);
+void XN_CALLBACK_TYPE User_LostUser				(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x);
+void XN_CALLBACK_TYPE UserPose_PoseDetected	(XnNodeHandle hPoseCapability, const XnChar *strPose, XnUserID userID, t_jit_openni *x);
+void XN_CALLBACK_TYPE UserCalibration_CalibrationStart(XnNodeHandle hSkeletonCapability, XnUserID userID, t_jit_openni *x);
+void XN_CALLBACK_TYPE UserCalibration_CalibrationEnd	(XnNodeHandle hSkeletonCapability, XnUserID userID, XnBool bSuccess, t_jit_openni *x);
 
 // max.jit.openni.c
 t_jit_err		jit_openni_init					(void);
@@ -205,6 +211,7 @@ void			*max_jit_openni_new				(t_symbol *s, long argc, t_atom *argv);
 void			max_jit_openni_free				(t_max_jit_openni *x);
 void			max_jit_openni_XMLConfig_read	(t_max_jit_openni *x, t_symbol *s, short argc, t_atom *argv);
 void			max_jit_openni_outputmatrix		(t_max_jit_openni *x);
+void			max_jit_openni_post_events		(t_jit_openni *x, enum JitOpenNIEvents iEventType, XnUserID userID);
 
 
 #endif
