@@ -213,11 +213,12 @@ void max_jit_openni_assist(t_max_jit_openni *x, void *b, long io, long index, ch
 void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc, t_atom *argv)
 {
 	long i;
-	t_atom *ap;	
+	t_atom OutAtoms[2];	
 	short filePathID;
 	long fileType = 'TEXT', outType;
 	char filename[MAX_FILENAME_CHARS];
 	char fullyQualifiedPathname[MAX_PATH_CHARS];
+	XnStatus nRetVal = XN_STATUS_OK;
 	
 #ifdef _DEBUG
 	t_object *mypatcher;
@@ -243,13 +244,19 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 		if (open_dialog(filename, &filePathID, &outType, &fileType, 1))
 		{
 			// non-zero: user cancelled or error
-			LOG_ERROR("error getting XML config file from dialog box for max.jit.openni");
+			LOG_DEBUG("error getting XML config file from dialog box for max.jit.openni");
+			atom_setsym(OutAtoms, gensym("<none>"));
+			atom_setlong(OutAtoms + 1, 0);
+			max_jit_obex_dumpout(x, gensym("read"), 2, OutAtoms);
 			return;
 		}
 	}
 	else if ((argc != 1) || (atom_gettype(argv) != A_SYM))
 	{
-		LOG_ERROR("read must have only one symbol argument");
+		LOG_DEBUG("read must have only one symbol argument");
+		atom_setsym(OutAtoms, gensym("<none>"));
+		atom_setlong(OutAtoms + 1, 0);
+		max_jit_obex_dumpout(x, gensym("read"), 2, OutAtoms);
 		return;
 	}
 	else // we have exactly one symbol argument
@@ -257,16 +264,34 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 		strncpy_zero(filename, atom_getsym(argv)->s_name, MAX_FILENAME_CHARS);
 		if (locatefile_extended(filename, &filePathID, &outType, &fileType, 1))
 		{
-			LOG_ERROR2("Could not find file", atom_getsym(argv)->s_name);
+			LOG_DEBUG2("Could not find file", atom_getsym(argv)->s_name);
+			atom_setsym(OutAtoms, atom_getsym(argv));
+			atom_setlong(OutAtoms + 1, 0);
+			max_jit_obex_dumpout(x, gensym("read"), 2, OutAtoms);
 			return;
 		}
 	}
 
 	//Load file
+	atom_setsym(OutAtoms, gensym(filename));
 	if (path_topathname(filePathID, filename, fullyQualifiedPathname) == 0)
 	{
 		LOG_DEBUG2("asking Jitter object to load file %s", fullyQualifiedPathname);
-		jit_object_method(max_jit_obex_jitob_get(x), gensym("init_from_xml"), gensym(fullyQualifiedPathname));
+		jit_object_method(max_jit_obex_jitob_get(x), gensym("init_from_xml"), gensym(fullyQualifiedPathname), &nRetVal);
+		if (nRetVal)
+		{
+			atom_setlong(OutAtoms + 1, 0);
+		}
+		else
+		{
+			atom_setlong(OutAtoms + 1, 1);
+		}
+		max_jit_obex_dumpout(x, gensym("read"), 2, OutAtoms);
+	}
+	else
+	{
+		atom_setlong(OutAtoms + 1, 0);
+		max_jit_obex_dumpout(x, gensym("read"), 2, OutAtoms);
 	}
 
 }

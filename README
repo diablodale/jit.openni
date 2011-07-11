@@ -36,6 +36,9 @@ Build notes-----------
 - You will need to change the build's include and library directories to match
   the locations in the Max SDK and OpenNI SDK.
 
+v0.6.3---------
+- output success or failure of read message via dumpout
+
 v0.6.2---------
 - now limit the possible values of jit.openni's custom attributes to valid values
 - minor bug fixes, logic optimizations, performance tweak

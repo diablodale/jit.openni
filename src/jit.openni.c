@@ -340,8 +340,8 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 #endif
 					LOG_DEBUG3("generator[%d] gotNew=%s", i, ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->bIsNew ? "true":"false"); // TODO remove this, output should match LOG_WARNING2 above
 
-					jit_object_method(out_matrix[i], _jit_sym_setinfo, &out_minfo);
-					jit_object_method(out_matrix[i], _jit_sym_getinfo, &out_minfo);	// BUGBU for some reason, I have to call this or Max crashes when you change matrix attributes via inspector
+					jit_object_method(out_matrix[i], _jit_sym_setinfo, &out_minfo);	// after testing with max_jit_mop_notify(), setting info that is the same as the existing matrix does not trigger the modify or rebuild matrix functions
+					jit_object_method(out_matrix[i], _jit_sym_getinfo, &out_minfo);	// BUGBUG for some reason, I have to call this or Max crashes when you change matrix attributes via inspector
 #ifdef _DEBUG
 					// get dimensions/planecount
 					dimcount = out_minfo.dimcount;
@@ -487,38 +487,37 @@ void jit_openni_calculate_ndim(XnDepthMetaData *pMapMetaData, long dimcount, lon
 	}
 }
 
-void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s)
+void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 {
 	XnEnumerationErrors* pErrors;
-	XnStatus nRetVal = XN_STATUS_OK;
+	//XnStatus nRetVal = XN_STATUS_OK; TODO remove this
 	XnNodeInfoListIterator pCurrentNode;
 	XnNodeInfo* pProdNodeInfo;
 
-	nRetVal = xnEnumerationErrorsAllocate(&pErrors);
-	CHECK_RC_ERROR_EXIT(nRetVal, "jit_openni_init_from_xml: cannot allocate errors object");
+	*nRetVal = xnEnumerationErrorsAllocate(&pErrors);
+	CHECK_RC_ERROR_EXIT(*nRetVal, "jit_openni_init_from_xml: cannot allocate errors object");
 
-	nRetVal = xnStopGeneratingAll(x->pContext);		// should stop generators in case we are loading a new XML file
-	CHECK_RC_ERROR_EXIT(nRetVal, "jit_openni_init_from_xml: cannot stop all generators before loading XML config");
+	*nRetVal = xnStopGeneratingAll(x->pContext);		// should stop generators in case we are loading a new XML file
+	CHECK_RC_ERROR_EXIT(*nRetVal, "jit_openni_init_from_xml: cannot stop all generators before loading XML config");
 
-	nRetVal = xnContextRunXmlScriptFromFile(x->pContext, s->s_name, pErrors);	// BUGBUG this doesn't seem to support loading a 2nd XML file
+	*nRetVal = xnContextRunXmlScriptFromFile(x->pContext, s->s_name, pErrors);	// BUGBUG this doesn't seem to support loading a 2nd XML file
 																				// may need to iterate xnProductionNodeRelease() or xnShutdown()
-	if (nRetVal == XN_STATUS_NO_NODE_PRESENT)
+	if (*nRetVal == XN_STATUS_NO_NODE_PRESENT)
 	{
 		XnChar strError[1024];
 		xnEnumerationErrorsToString(pErrors, strError, 1024);
 		LOG_ERROR2("XMLconfig initialization failed", strError);
 		xnEnumerationErrorsFree(pErrors);
-		return;
 	}
 	xnEnumerationErrorsFree(pErrors);
-	if (nRetVal != XN_STATUS_OK)
+	if (*nRetVal != XN_STATUS_OK)
 	{
-		CHECK_RC_ERROR_EXIT(nRetVal, "XML config initialization open failed");
+		CHECK_RC_ERROR_EXIT(*nRetVal, "XML config initialization open failed");
 	}
 	LOG_DEBUG2("XMLconfig loaded: %s", s->s_name);
 
-	nRetVal = xnEnumerateExistingNodes(x->pContext,&x->pProductionNodeList);
-	CHECK_RC_ERROR_EXIT(nRetVal, "XMLconfig cannot enumerate existing production nodes");
+	*nRetVal = xnEnumerateExistingNodes(x->pContext,&x->pProductionNodeList);
+	CHECK_RC_ERROR_EXIT(*nRetVal, "XMLconfig cannot enumerate existing production nodes");
 	for (pCurrentNode = xnNodeInfoListGetFirst(x->pProductionNodeList); xnNodeInfoListIteratorIsValid(pCurrentNode); pCurrentNode = xnNodeInfoListGetNext(pCurrentNode))
 	{
 		pProdNodeInfo = xnNodeInfoListGetCurrent(pCurrentNode);
@@ -543,11 +542,11 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s)
 				LOG_DEBUG2("Depth generator supports (%u) user position optimizations", uUserPos);
 				for (i=0; i<uUserPos; i++)
 				{
-					nRetVal = xnGetUserPosition(x->hProductionNode[DEPTH_GEN_INDEX], i, &box);
-					if (nRetVal)
+					*nRetVal = xnGetUserPosition(x->hProductionNode[DEPTH_GEN_INDEX], i, &box);
+					if (*nRetVal)
 					{
-						LOG_WARNING_RC(nRetVal, "xnGetUserPositions");
-						nRetVal = XN_STATUS_OK;
+						LOG_WARNING_RC(*nRetVal, "xnGetUserPositions");
+						*nRetVal = XN_STATUS_OK;
 					}
 					else
 					{
@@ -622,8 +621,8 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s)
 	}
 	LOG_DEBUG2("bHaveValidGeneratorProductionNode=%s", (x->bHaveValidGeneratorProductionNode ? "true": "false"));
 
-	nRetVal = xnStartGeneratingAll(x->pContext);
-	CHECK_RC_ERROR_EXIT(nRetVal, "XMLconfig cannot start all generator nodes");
+	*nRetVal = xnStartGeneratingAll(x->pContext);
+	CHECK_RC_ERROR_EXIT(*nRetVal, "XMLconfig cannot start all generator nodes");
 
 #ifdef _DEBUG
 	if (x->hProductionNode[DEPTH_GEN_INDEX])
