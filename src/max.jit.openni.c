@@ -304,7 +304,8 @@ void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 					for (j=1; j<= NUM_OF_SKELETON_JOINT_TYPES; j++)
 					{
 						if (pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.fConfidence >= pJit_OpenNI->fPositionConfidenceFilter &&
-								pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.fConfidence >= pJit_OpenNI->fOrientConfidenceFilter)
+								( pJit_OpenNI->bOutputSkeletonOrientation ?
+								(pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.fConfidence >= pJit_OpenNI->fOrientConfidenceFilter) : true))
 						{
 							snprintf_zero(osc_string, MAX_LENGTH_STR_JOINT_NAME + 9, "/skel/%u/%s", pJit_OpenNI->pUserSkeletonJoints->userID, strJointNames[j]);
 							atom_setfloat(osc_argv, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.X);

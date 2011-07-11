@@ -36,6 +36,10 @@ Build notes-----------
 - You will need to change the build's include and library directories to match
   the locations in the Max SDK and OpenNI SDK.
 
+v0.6.2---------
+- now limit the possible values of jit.openni's custom attributes to valid values
+- minor bug fixes, logic optimizations, performance tweak
+
 v0.6.1---------
 - fixed ordering of outlets, dumpout is now on the far right
 - updated OSC address pattern format for skeleton joint output to start with "/skel/"

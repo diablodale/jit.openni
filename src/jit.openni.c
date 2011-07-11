@@ -120,15 +120,22 @@ t_jit_err jit_openni_init(void)
 	// add attribute(s)
 	attr = jit_object_new(_jit_sym_jit_attr_offset, "position_confidence_filter", _jit_sym_float32, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW,
 			NULL, NULL, calcoffset(t_jit_openni, fPositionConfidenceFilter));
+	jit_attr_addfilterset_clip(attr,0.0,1.0,TRUE,TRUE);
 	jit_class_addattr(s_jit_openni_class, attr);
+
 	attr = jit_object_new(_jit_sym_jit_attr_offset, "orient_confidence_filter", _jit_sym_float32, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW,
 			NULL, NULL, calcoffset(t_jit_openni, fOrientConfidenceFilter));
+	jit_attr_addfilterset_clip(attr,0.0,1.0,TRUE,TRUE);
 	jit_class_addattr(s_jit_openni_class, attr);
+	
 	attr = jit_object_new(_jit_sym_jit_attr_offset, "output_skeleton_orientation", _jit_sym_char, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW,
 			NULL, NULL, calcoffset(t_jit_openni, bOutputSkeletonOrientation));
+	jit_attr_addfilterset_clip(attr,0,1,TRUE,TRUE);
 	jit_class_addattr(s_jit_openni_class, attr);
+	
 	attr = jit_object_new(_jit_sym_jit_attr_offset, "skeleton_smooth_factor", _jit_sym_float32, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW,
-			NULL, NULL, calcoffset(t_jit_openni, fSkeletonSmoothingFactor));
+			NULL, jit_openni_skelsmooth_set, calcoffset(t_jit_openni, fSkeletonSmoothingFactor));
+	jit_attr_addfilterset_clip(attr,0.0,1.0,TRUE,TRUE);
 	jit_class_addattr(s_jit_openni_class, attr);
 
 	// finalize class
@@ -197,6 +204,20 @@ void jit_openni_free(t_jit_openni *x)
 	LOG_DEBUG("object freed");
 }
 
+t_jit_err jit_openni_skelsmooth_set(t_jit_openni *x, void *attr, long ac, t_atom *av)
+{
+	if (ac && av)
+	{
+		x->fSkeletonSmoothingFactor = jit_atom_getfloat(av);
+	}
+	else
+	{
+		// no args, set to zero
+		x->fSkeletonSmoothingFactor = 0.0;
+	}
+	if (x->bHaveSkeletonSupport) xnSetSkeletonSmoothing(x->hProductionNode[USER_GEN_INDEX],x->fSkeletonSmoothingFactor);
+	return JIT_ERR_NONE;
+}
 
 t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 {
@@ -209,6 +230,10 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 	boolean bGotOutMatrices = true;
 	XnStatus nRetVal = XN_STATUS_OK;
 	XnUInt16 tmpNumUsers;
+#ifdef _DEBUG
+	long long unsigned lluTimestamp = 0;
+	long unsigned luFrameID;
+#endif
 
 	// get the zeroth index input and output from
 	// the corresponding input and output lists
@@ -271,14 +296,13 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 					case XN_NODE_TYPE_USER:
 						xnGetUserPixels(x->hProductionNode[USER_GEN_INDEX], 0, (XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX]);
 						if (err = changeMatrixOutputGivenMapMetaData(x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX], &out_minfo)) goto out;
-
+						LOG_DEBUG3("**USER**FrameID=%lu Timestamp=%llu", ((XnSceneMetaData *)x->pMapMetaData[i])->pMap->pOutput->nFrameID, ((XnSceneMetaData *)x->pMapMetaData[i])->pMap->pOutput->nTimestamp);
 						tmpNumUsers = MAX_NUM_USERS_SUPPORTED;
 						xnGetUsers(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs, &tmpNumUsers);
 						LOG_DEBUG2("Current num of users=%d", tmpNumUsers);
 						
 						if (x->bHaveSkeletonSupport)
 						{
-							xnSetSkeletonSmoothing(x->hProductionNode[USER_GEN_INDEX],x->fSkeletonSmoothingFactor);
 							x->iNumUserSkeletonJoints = 0;
 							for (j=0; j<tmpNumUsers; j++)
 							{
@@ -299,9 +323,21 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 						}
 					}
 //					if (xnIsTypeDerivedFrom(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type, XN_NODE_TYPE_MAP_GENERATOR))
-
-					LOG_DEBUG3("generator[%d] pixelformat=%s", i, xnPixelFormatToString(((XnDepthMetaData *)x->pMapMetaData[i])->pMap->PixelFormat));
 					LOG_DEBUG("updated metadata for incoming map generator frame");
+					LOG_DEBUG3("generator[%d] pixelformat=%s", i, xnPixelFormatToString(((XnDepthMetaData *)x->pMapMetaData[i])->pMap->PixelFormat));
+					LOG_DEBUG3("FrameID=%lu Timestamp=%llu", ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->nFrameID, ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->nTimestamp);
+#ifdef _DEBUG
+					if (!lluTimestamp)
+					{
+						lluTimestamp = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->nTimestamp;
+						luFrameID = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->nFrameID;
+					}
+					else
+					{
+						if (lluTimestamp != ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->nTimestamp) LOG_ERROR("Timestamps are not the same for all generators within a single update");
+						if (luFrameID != ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->nFrameID) LOG_ERROR("FrameIDs are not the same for all generators within a single update");
+					}
+#endif
 					LOG_DEBUG3("generator[%d] gotNew=%s", i, ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->bIsNew ? "true":"false"); // TODO remove this, output should match LOG_WARNING2 above
 
 					jit_object_method(out_matrix[i], _jit_sym_setinfo, &out_minfo);
@@ -497,6 +533,29 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s)
 			x->hProductionNode[DEPTH_GEN_INDEX] = xnNodeInfoGetHandle(pProdNodeInfo);
 			xnGetDepthMetaData(x->hProductionNode[DEPTH_GEN_INDEX], (XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX]);
 			x->bHaveValidGeneratorProductionNode = true;
+#ifdef _DEBUG
+			if (xnIsCapabilitySupported(x->hProductionNode[DEPTH_GEN_INDEX], XN_CAPABILITY_USER_POSITION))
+			{
+				unsigned int uUserPos, i;
+				XnBoundingBox3D box;
+
+				uUserPos = xnGetSupportedUserPositionsCount(x->hProductionNode[DEPTH_GEN_INDEX]);
+				LOG_DEBUG2("Depth generator supports (%u) user position optimizations", uUserPos);
+				for (i=0; i<uUserPos; i++)
+				{
+					nRetVal = xnGetUserPosition(x->hProductionNode[DEPTH_GEN_INDEX], i, &box);
+					if (nRetVal)
+					{
+						LOG_WARNING_RC(nRetVal, "xnGetUserPositions");
+						nRetVal = XN_STATUS_OK;
+					}
+					else
+					{
+						object_post((t_object*)x, "userpos[%u]= (%f, %f, %f) (%f, %f, %f)", i, box.LeftBottomNear.X, box.LeftBottomNear.Y, box.LeftBottomNear.Z, box.RightTopFar.X, box.RightTopFar.Y, box.RightTopFar.Z);
+					}
+				}
+			}
+#endif
 			break;
 		case XN_NODE_TYPE_IMAGE:
 			x->hProductionNode[IMAGE_GEN_INDEX] = xnNodeInfoGetHandle(pProdNodeInfo);
@@ -514,34 +573,41 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s)
 			xnGetUserPixels(x->hProductionNode[USER_GEN_INDEX], 0, (XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX]);
 			x->bHaveValidGeneratorProductionNode = true;
 
-			// check for then setup skeleton support
+			// check for and then setup skeleton support
 			if (xnIsCapabilitySupported(x->hProductionNode[USER_GEN_INDEX], XN_CAPABILITY_SKELETON))
 			{
 				if (xnIsProfileAvailable(x->hProductionNode[USER_GEN_INDEX], XN_SKEL_PROFILE_ALL))
 				{
-					xnSetSkeletonProfile(x->hProductionNode[USER_GEN_INDEX], XN_SKEL_PROFILE_ALL);
-					x->bHaveSkeletonSupport = true;
-					xnRegisterCalibrationCallbacks(x->hProductionNode[USER_GEN_INDEX], UserCalibration_CalibrationStart, UserCalibration_CalibrationEnd, x, &(x->hCalibrationCallbacks));
-					if (xnNeedPoseForSkeletonCalibration (x->hProductionNode[USER_GEN_INDEX]))
+					if (xnNeedPoseForSkeletonCalibration(x->hProductionNode[USER_GEN_INDEX]))
 					{
-						x->bNeedPose = true;
 						if (xnIsCapabilitySupported(x->hProductionNode[USER_GEN_INDEX], XN_CAPABILITY_POSE_DETECTION))
 						{
 							LOG_DEBUG2("user generator supports %u poses", xnGetNumberOfPoses(x->hProductionNode[USER_GEN_INDEX]));
 							xnRegisterToPoseCallbacks(x->hProductionNode[USER_GEN_INDEX], UserPose_PoseDetected, NULL, x, &(x->hPoseCallbacks));
 							xnGetSkeletonCalibrationPose(x->hProductionNode[USER_GEN_INDEX], x->strRequiredCalibrationPose);
+							x->bNeedPose = true;
+							x->bHaveSkeletonSupport = true;
 						}
 						else
 						{
 							LOG_ERROR("Pose required for skeleton, but user generator doesn't support detecting poses");
-							x->bHaveSkeletonSupport = false;
 						}
 					}
-					if (x->bHaveSkeletonSupport) x->pUserSkeletonJoints = (t_user_and_joints *)sysmem_newptr(sizeof(t_user_and_joints) * MAX_NUM_USERS_SUPPORTED);
+					else
+					{
+						x->bHaveSkeletonSupport = true;
+					}
+					if (x->bHaveSkeletonSupport)
+					{
+						xnSetSkeletonProfile(x->hProductionNode[USER_GEN_INDEX], XN_SKEL_PROFILE_ALL);
+						xnRegisterCalibrationCallbacks(x->hProductionNode[USER_GEN_INDEX], UserCalibration_CalibrationStart, UserCalibration_CalibrationEnd, x, &(x->hCalibrationCallbacks));
+						x->pUserSkeletonJoints = (t_user_and_joints *)sysmem_newptr(sizeof(t_user_and_joints) * MAX_NUM_USERS_SUPPORTED);
+						xnSetSkeletonSmoothing(x->hProductionNode[USER_GEN_INDEX],x->fSkeletonSmoothingFactor);
+					}
 				}
 				else
 				{
-					LOG_ERROR("User generator skeleton capability must support all joints profile XN_SKEL_PROFILE_ALL");
+					LOG_ERROR("User generator skeleton capability must support the all joints profile XN_SKEL_PROFILE_ALL");
 				}
 			}
 			else
@@ -652,6 +718,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s)
 // register to receive callbacks for jit_open object events
 t_jit_err RegisterJitOpenNIEventCallbacks(t_jit_openni *x, JitOpenNIEventHandler funcCallback, void **hUnregister)
 {
+	// TODO make a critical region critical_enter() for navigating the linked list in register and unregister
 	LOG_DEBUG2("starting size of linklist=%ld", jit_linklist_getsize(x->pEventCallbackFunctions));
 	if ( jit_linklist_append(x->pEventCallbackFunctions, funcCallback) == -1)		// TODO, I want to use jit_linklist_insertindex() here but it crashes on an empty list
 	{
@@ -659,7 +726,7 @@ t_jit_err RegisterJitOpenNIEventCallbacks(t_jit_openni *x, JitOpenNIEventHandler
 	}
 	else
 	{
-		*hUnregister = jit_linklist_index2ptr(x->pEventCallbackFunctions, jit_linklist_objptr2index(x->pEventCallbackFunctions, funcCallback));
+		*hUnregister = jit_linklist_index2ptr(x->pEventCallbackFunctions, jit_linklist_objptr2index(x->pEventCallbackFunctions, funcCallback));	// this is not thread safe, however, Max APIs are limiting me
 		LOG_DEBUG3("added regid=%x, ending size of linklist=%ld", *hUnregister, jit_linklist_getsize(x->pEventCallbackFunctions));
 	}
 	return JIT_ERR_NONE;
@@ -715,6 +782,7 @@ void XN_CALLBACK_TYPE User_NewUser(XnNodeHandle hUserGenerator, XnUserID userID,
 // Callback: An existing user was lost
 void XN_CALLBACK_TYPE User_LostUser(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x)
 {
+	xnStopPoseDetection(hUserGenerator, userID);
 	makeCallbacks(x, JITOPENNI_LOST_USER, userID);
 }
 
