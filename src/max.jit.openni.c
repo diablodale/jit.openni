@@ -315,7 +315,11 @@ void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 				jit_object_method(mop,_jit_sym_getinputlist),
 				jit_object_method(mop,_jit_sym_getoutputlist)))						
 			{
-				jit_error_code(x,err); 
+				if (err != JIT_ERR_HW_UNAVAILABLE)
+				{
+					jit_error_code(x,err);
+					LOG_DEBUG("Got error trying to call into the jit.openni matrix_calc");
+				}
 			}
 			else
 			{

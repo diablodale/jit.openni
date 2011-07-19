@@ -235,6 +235,8 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 	long unsigned luFrameID;
 #endif
 
+	if (!x->bHaveValidGeneratorProductionNode) return JIT_ERR_HW_UNAVAILABLE;
+	
 	// get the zeroth index input and output from
 	// the corresponding input and output lists
 	for (i=0;i<NUM_OPENNI_MAPS;i++)
@@ -247,7 +249,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 	}
 
 	// if the object and both input and output matrices, both generators are valid, then process else error
-	if (x && bGotOutMatrices && x->bHaveValidGeneratorProductionNode)
+	if (x && bGotOutMatrices)
 	{
 		// lock input and output matrices TODO its possible to move this inside the below i through NUM_OPENNI_GENERATORS iteration if it is not important for all matrices to be locked before any work
 		for (i = 0; i< NUM_OPENNI_MAPS; i++)
@@ -507,7 +509,6 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 		XnChar strError[1024];
 		xnEnumerationErrorsToString(pErrors, strError, 1024);
 		LOG_ERROR2("XMLconfig initialization failed", strError);
-		xnEnumerationErrorsFree(pErrors);
 	}
 	xnEnumerationErrorsFree(pErrors);
 	if (*nRetVal != XN_STATUS_OK)
