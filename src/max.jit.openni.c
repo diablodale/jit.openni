@@ -302,69 +302,68 @@ void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 	void *mop = max_jit_obex_adornment_get(x,_jit_sym_jit_mop);
 	t_jit_openni *pJit_OpenNI = (t_jit_openni *)max_jit_obex_jitob_get(x);
 	t_jit_err err;	
+	t_atom osc_argv[14];
+	char osc_string[MAX_LENGTH_STR_JOINT_NAME + 9];	// max joint string + 9 "/skel/xx/"
+	int i, j, k;
 	
 	LOG_DEBUG("starting custom outputmatrix()");
 	if (outputmode && mop)
 	{
 		//always output unless output mode is none
+		if (outputmode==2) // pass input case, but since jit.openni has no input then this means no output
+		{
+			LOG_DEBUG("bypassing matrix_calc(), bypassing outputmatrix()");
+			return;
+		}
 
 		if (outputmode==1)
 		{
 			LOG_DEBUG("about to call matrix_calc from custom outputmatrix");
-			if (err=(t_jit_err)jit_object_method(max_jit_obex_jitob_get(x), _jit_sym_matrix_calc,
-				jit_object_method(mop,_jit_sym_getinputlist),
-				jit_object_method(mop,_jit_sym_getoutputlist)))						
+			if (err = (t_jit_err)jit_object_method(max_jit_obex_jitob_get(x), _jit_sym_matrix_calc,
+				  jit_object_method(mop,_jit_sym_getinputlist),
+				  jit_object_method(mop,_jit_sym_getoutputlist)))
 			{
-				if (err != JIT_ERR_HW_UNAVAILABLE)
-				{
-					jit_error_code(x,err);
-					LOG_DEBUG("Got error trying to call into the jit.openni matrix_calc");
-				}
+				if (err != JIT_ERR_HW_UNAVAILABLE) jit_error_code(x,err);
+				return;
 			}
-			else
-			{
-				t_atom osc_argv[14];
-				char osc_string[MAX_LENGTH_STR_JOINT_NAME + 9];	// max joint string + 9 "/skel/xx/"
-				int i, j, k;
+		}
 
-				LOG_DEBUG("called matrix_calc()");
-				for (i=0; i<pJit_OpenNI->iNumUserSkeletonJoints; i++)
+		for (i=0; i<pJit_OpenNI->iNumUserSkeletonJoints; i++)
+		{
+			for (j=1; j<= NUM_OF_SKELETON_JOINT_TYPES; j++)
+			{
+				if (pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.fConfidence >= pJit_OpenNI->fPositionConfidenceFilter &&
+						( pJit_OpenNI->bOutputSkeletonOrientation ?
+						(pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.fConfidence >= pJit_OpenNI->fOrientConfidenceFilter) : true))
 				{
-					for (j=1; j<= NUM_OF_SKELETON_JOINT_TYPES; j++)
+					snprintf_zero(osc_string, MAX_LENGTH_STR_JOINT_NAME + 9, "/skel/%u/%s", pJit_OpenNI->pUserSkeletonJoints->userID, strJointNames[j]);
+					atom_setfloat(osc_argv, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.X);
+					atom_setfloat(osc_argv + 1, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.Y);
+					atom_setfloat(osc_argv + 2, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.Z);
+					atom_setfloat(osc_argv + 3, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.fConfidence);
+					if (pJit_OpenNI->bOutputSkeletonOrientation)
 					{
-						if (pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.fConfidence >= pJit_OpenNI->fPositionConfidenceFilter &&
-								( pJit_OpenNI->bOutputSkeletonOrientation ?
-								(pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.fConfidence >= pJit_OpenNI->fOrientConfidenceFilter) : true))
+						// TODO need to verify I've extracted the correct direction vector for each joint's local axes
+						//for (k=0; k<9; k++) atom_setfloat(osc_argv + 4 + k, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.orientation.elements[k]);
+						for (k=0; k<3; k++)
 						{
-							snprintf_zero(osc_string, MAX_LENGTH_STR_JOINT_NAME + 9, "/skel/%u/%s", pJit_OpenNI->pUserSkeletonJoints->userID, strJointNames[j]);
-							atom_setfloat(osc_argv, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.X);
-							atom_setfloat(osc_argv + 1, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.Y);
-							atom_setfloat(osc_argv + 2, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.Z);
-							atom_setfloat(osc_argv + 3, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.fConfidence);
-							if (pJit_OpenNI->bOutputSkeletonOrientation)
-							{
-								for (k=0; k<9; k++) atom_setfloat(osc_argv + 4 + k, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.orientation.elements[k]);
-								atom_setfloat(osc_argv + 13, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.fConfidence);
-								outlet_anything(x->osc_outlet, gensym(osc_string), 14, osc_argv);
-							}
-							else
-							{
-								outlet_anything(x->osc_outlet, gensym(osc_string), 4, osc_argv);
-							}
+							atom_setfloat(osc_argv + 4 + (k*3), pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.orientation.elements[k]);
+							atom_setfloat(osc_argv + 4 + (k*3) + 1, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.orientation.elements[k+3]);
+							atom_setfloat(osc_argv + 4 + (k*3) + 2, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.orientation.elements[k+6]);
 						}
+						atom_setfloat(osc_argv + 13, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.fConfidence);
+						outlet_anything(x->osc_outlet, gensym(osc_string), 14, osc_argv);
+					}
+					else
+					{
+						outlet_anything(x->osc_outlet, gensym(osc_string), 4, osc_argv);
 					}
 				}
-				LOG_DEBUG("now calling outputmatrix()");
-				max_jit_mop_outputmatrix(x);
-				LOG_DEBUG("called outputmatrix()");
 			}
 		}
-		else if (outputmode==3)
-		{
-			LOG_DEBUG("bypassing matrix_calc(), now calling outputmatrix()");
-			max_jit_mop_outputmatrix(x);
-			LOG_DEBUG("called outputmatrix()");
-		}
+		LOG_DEBUG("now calling outputmatrix()");
+		max_jit_mop_outputmatrix(x);
+		LOG_DEBUG("called outputmatrix()");
 	}	
 }
 

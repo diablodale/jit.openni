@@ -45,7 +45,7 @@
 // Macros
 //---------------------------------------------------------------------------
 
-#define JIT_OPENNI_VERSION "v0.6.4"
+#define JIT_OPENNI_VERSION "v0.6.5"
 #define MAX_NUM_USERS_SUPPORTED 15		// I have not found an OpenNI API to determine the max number possible for user generators
 #define NUM_OF_SKELETON_JOINT_TYPES 24	// I have not found an OpenNI API to determine the number of joints types (head, left foot, etc.) for a user generator
 #define NUM_OPENNI_GENERATORS 4
@@ -66,8 +66,8 @@
 #define DEPTHMAP_ASSIST_TEXT "(matrix) depthmap generator"	// if adding or removing assist text definitions, update max_jit_openni_assist() in max.jit.openni.c
 #define IMAGEMAP_ASSIST_TEXT "(matrix) imagemap generator"
 #define IRMAP_ASSIST_TEXT "(matrix) irmap generator"
-#define USERPIXELMAP_ASSIST_TEXT "(matrix) userpixelsmap generator"
-#define SKELETON_ASSIST_TEXT "(OSC) skeletons"
+#define USERPIXELMAP_ASSIST_TEXT "(matrix) usermap generator"
+#define SKELETON_ASSIST_TEXT "(OSC) skeleton"
 
 #define NUM_JITOPENNI_OUTPUTS (NUM_OPENNI_MAPS + NUM_OPENNI_MISC_OUTPUTS)	// this is the total number of outputs on the jit.open external not counting dumpout.
 
@@ -175,7 +175,7 @@ typedef struct _jit_openni {
 	XnCallbackHandle hUserCallbacks, hCalibrationCallbacks, hPoseCallbacks;
 	XnChar strRequiredCalibrationPose[XN_MAX_NAME_LENGTH];
 	float fPositionConfidenceFilter, fOrientConfidenceFilter, fSkeletonSmoothingFactor;
-	char bOutputSkeletonOrientation;
+	char bOutputSkeletonOrientation, bOutputDepthmap, bOutputImagemap, bOutputIRmap, bOutputUserPixelsmap, bOutputSkeleton;
 	short iNumUserSkeletonJoints;
 	t_user_and_joints *pUserSkeletonJoints;
 	t_jit_linklist *pEventCallbackFunctions;

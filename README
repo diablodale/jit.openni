@@ -36,6 +36,10 @@ Build notes-----------
 - You will need to change the build's include and library directories to match
   the locations in the Max SDK and OpenNI SDK.
 
+v0.6.5---------
+- added 5 attributes which enable (default) or not the output for a given outlet; allows for decreasing resource utilization
+- corrected ordering of joint orientation output...I think...
+
 v0.6.4---------
 - no longer log error if send a bang before XML config was successfully loaded
 - fixed crashing bug introduced in v0.6.3 that only occurred if Kinect was unplugged and you tried to load an XML config file

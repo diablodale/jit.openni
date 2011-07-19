@@ -138,6 +138,31 @@ t_jit_err jit_openni_init(void)
 	jit_attr_addfilterset_clip(attr,0.0,1.0,TRUE,TRUE);
 	jit_class_addattr(s_jit_openni_class, attr);
 
+	attr = jit_object_new(_jit_sym_jit_attr_offset, "output_depthmap", _jit_sym_char, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW,
+			NULL, NULL, calcoffset(t_jit_openni, bOutputDepthmap));
+	jit_attr_addfilterset_clip(attr,0,1,TRUE,TRUE);
+	jit_class_addattr(s_jit_openni_class, attr);
+
+	attr = jit_object_new(_jit_sym_jit_attr_offset, "output_imagemap", _jit_sym_char, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW,
+			NULL, NULL, calcoffset(t_jit_openni, bOutputImagemap));
+	jit_attr_addfilterset_clip(attr,0,1,TRUE,TRUE);
+	jit_class_addattr(s_jit_openni_class, attr);
+
+	attr = jit_object_new(_jit_sym_jit_attr_offset, "output_irmap", _jit_sym_char, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW,
+			NULL, NULL, calcoffset(t_jit_openni, bOutputIRmap));
+	jit_attr_addfilterset_clip(attr,0,1,TRUE,TRUE);
+	jit_class_addattr(s_jit_openni_class, attr);
+
+	attr = jit_object_new(_jit_sym_jit_attr_offset, "output_usermap", _jit_sym_char, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW,
+			NULL, NULL, calcoffset(t_jit_openni, bOutputUserPixelsmap));
+	jit_attr_addfilterset_clip(attr,0,1,TRUE,TRUE);
+	jit_class_addattr(s_jit_openni_class, attr);
+
+	attr = jit_object_new(_jit_sym_jit_attr_offset, "output_skeleton", _jit_sym_char, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW,
+			NULL, NULL, calcoffset(t_jit_openni, bOutputSkeleton));
+	jit_attr_addfilterset_clip(attr,0,1,TRUE,TRUE);
+	jit_class_addattr(s_jit_openni_class, attr);
+
 	// finalize class
 	jit_class_register(s_jit_openni_class);
 	return JIT_ERR_NONE;
@@ -162,8 +187,14 @@ t_jit_openni *jit_openni_new(void *pParent)
 		x->fPositionConfidenceFilter = 0.0;
 		x->fOrientConfidenceFilter = 0.0;
 		x->bOutputSkeletonOrientation = 0;
+		x->bOutputDepthmap = 1;
+		x->bOutputImagemap = 1;
+		x->bOutputIRmap = 1;
+		x->bOutputUserPixelsmap = 1;
+		x->bOutputSkeleton = 1;
 		x->fSkeletonSmoothingFactor = 0.0;	//BUGBUG what is the OpenNI/NITE default?
 		x->pUserSkeletonJoints = NULL;
+		x->iNumUserSkeletonJoints = 0;
 		x->pEventCallbackFunctions = (t_jit_linklist *)jit_object_new(_jit_sym_jit_linklist);
 
 		LOG_DEBUG("Initializing OpenNI library");
@@ -229,7 +260,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 	void *out_matrix[NUM_OPENNI_MAPS];
 	boolean bGotOutMatrices = true;
 	XnStatus nRetVal = XN_STATUS_OK;
-	XnUInt16 tmpNumUsers;
+	XnUInt16 tmpNumUsers = MAX_NUM_USERS_SUPPORTED;
 #ifdef _DEBUG
 	long long unsigned lluTimestamp = 0;
 	long unsigned luFrameID;
@@ -239,7 +270,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 	
 	// get the zeroth index input and output from
 	// the corresponding input and output lists
-	for (i=0;i<NUM_OPENNI_MAPS;i++)
+	for (i=0;i<NUM_OPENNI_MAPS;i++)				// TODO could optimize this by using jitter linked list flattening API
 	{
 		if (!(out_matrix[i] = jit_object_method(outputs,_jit_sym_getindex,i)))
 		{
@@ -257,6 +288,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 			out_savelock[i] = (long) jit_object_method(out_matrix[i],_jit_sym_lock,1);
 		}
 
+		x->iNumUserSkeletonJoints = 0;	// invalidate all old skeletons, this allows max wrapper logic to work if we have bOutputSkeleton=false
 		// Don't wait for new data, just update all generators with the newest already available
 		nRetVal = xnWaitNoneUpdateAll(x->pContext);
 		if (nRetVal != XN_STATUS_OK)
@@ -284,28 +316,25 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 					switch(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type)
 					{
 					case XN_NODE_TYPE_DEPTH:
+						if (!x->bOutputDepthmap) continue;
 						xnGetDepthMetaData(x->hProductionNode[i], (XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX]);
 						if (err = changeMatrixOutputGivenMapMetaData(x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX], &out_minfo)) goto out;
 						break;
 					case XN_NODE_TYPE_IMAGE:
+						if (!x->bOutputImagemap) continue;
 						xnGetImageMetaData(x->hProductionNode[i], (XnImageMetaData *)x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX]);
 						if (err = changeMatrixOutputGivenMapMetaData(x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX], &out_minfo)) goto out;
 						break;
 					case XN_NODE_TYPE_IR:
+						if (!x->bOutputIRmap) continue;
 						xnGetIRMetaData(x->hProductionNode[i], (XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX]);
 						if (err = changeMatrixOutputGivenMapMetaData(x->pMapMetaData[IRMAP_OUTPUT_INDEX], &out_minfo)) goto out;
 						break;
 					case XN_NODE_TYPE_USER:
-						xnGetUserPixels(x->hProductionNode[USER_GEN_INDEX], 0, (XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX]);
-						if (err = changeMatrixOutputGivenMapMetaData(x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX], &out_minfo)) goto out;
-						LOG_DEBUG3("**USER**FrameID=%lu Timestamp=%llu", ((XnSceneMetaData *)x->pMapMetaData[i])->pMap->pOutput->nFrameID, ((XnSceneMetaData *)x->pMapMetaData[i])->pMap->pOutput->nTimestamp);
-						tmpNumUsers = MAX_NUM_USERS_SUPPORTED;
-						xnGetUsers(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs, &tmpNumUsers);
-						LOG_DEBUG2("Current num of users=%d", tmpNumUsers);
-						
-						if (x->bHaveSkeletonSupport)
+						if (x->bHaveSkeletonSupport && x->bOutputSkeleton)
 						{
-							x->iNumUserSkeletonJoints = 0;
+							xnGetUsers(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs, &tmpNumUsers);
+							LOG_DEBUG2("Current num of users=%d", tmpNumUsers);
 							for (j=0; j<tmpNumUsers; j++)
 							{
 								int iJoint;
@@ -323,6 +352,10 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 								}
 							}
 						}
+						if (!x->bOutputUserPixelsmap) continue;
+						xnGetUserPixels(x->hProductionNode[USER_GEN_INDEX], 0, (XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX]);
+						if (err = changeMatrixOutputGivenMapMetaData(x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX], &out_minfo)) goto out;
+						LOG_DEBUG3("**USERPXL**FrameID=%lu Timestamp=%llu", ((XnSceneMetaData *)x->pMapMetaData[i])->pMap->pOutput->nFrameID, ((XnSceneMetaData *)x->pMapMetaData[i])->pMap->pOutput->nTimestamp);
 					}
 //					if (xnIsTypeDerivedFrom(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type, XN_NODE_TYPE_MAP_GENERATOR))
 					LOG_DEBUG("updated metadata for incoming map generator frame");
@@ -340,7 +373,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 						if (luFrameID != ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->nFrameID) LOG_ERROR("FrameIDs are not the same for all generators within a single update");
 					}
 #endif
-					LOG_DEBUG3("generator[%d] gotNew=%s", i, ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->bIsNew ? "true":"false"); // TODO remove this, output should match LOG_WARNING2 above
+					LOG_DEBUG3("generator[%d] gotNew=%s", i, ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->bIsNew ? "true":"false"); // TODO remove this, output should match xnIsDataNew() above
 
 					jit_object_method(out_matrix[i], _jit_sym_setinfo, &out_minfo);	// after testing with max_jit_mop_notify(), setting info that is the same as the existing matrix does not trigger the modify or rebuild matrix functions
 					jit_object_method(out_matrix[i], _jit_sym_getinfo, &out_minfo);	// BUGBUG for some reason, I have to call this or Max crashes when you change matrix attributes via inspector
@@ -366,6 +399,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 			}
 		}
 out:
+		if (err) x->iNumUserSkeletonJoints = 0;		// invalidate skeletons if encountered an error
 		// restore matrix lock state to previous value
 		for (i = 0; i< NUM_OPENNI_MAPS; i++)
 		{
