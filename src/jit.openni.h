@@ -45,7 +45,7 @@
 // Macros
 //---------------------------------------------------------------------------
 
-#define JIT_OPENNI_VERSION "v0.6.5"
+#define JIT_OPENNI_VERSION "v0.6.6"
 #define MAX_NUM_USERS_SUPPORTED 15		// I have not found an OpenNI API to determine the max number possible for user generators
 #define NUM_OF_SKELETON_JOINT_TYPES 24	// I have not found an OpenNI API to determine the number of joints types (head, left foot, etc.) for a user generator
 #define NUM_OPENNI_GENERATORS 4
@@ -122,10 +122,12 @@
 	#define LOG_DEBUG(what) LOG_COMMENT(what)
 	#define LOG_DEBUG2(what,param1) LOG_COMMENT2(what,param1)
 	#define LOG_DEBUG3(what,param1,param2) LOG_COMMENT3(what,param1,param2)
+	#define LOG_DBGVIEW(what) {	cpost(what); }
 #else
 	#define LOG_DEBUG(what)
 	#define LOG_DEBUG2(what,param1)
 	#define LOG_DEBUG3(what,param1,param2)
+	#define LOG_DBGVIEW(what)
 #endif
 
 #define CHECK_RC_ERROR_EXIT(rc, what)										\
@@ -167,12 +169,12 @@ typedef struct _jit_openni {
 	t_object	ob;
 	void *pParent;
 	XnContext *pContext;
+	XnNodeHandle hScriptNode;	// this will own the nodes created through loading an XML config file
 	XnNodeHandle hProductionNode[NUM_OPENNI_GENERATORS]; // this only holds production node GENERATORS!
-	XnNodeInfoList *pProductionNodeList;
 	boolean bHaveValidGeneratorProductionNode, bNeedPose, bHaveSkeletonSupport;
 	XnMapMetaData *pMapMetaData[NUM_OPENNI_MAPS];
 	XnUserID aUserIDs[MAX_NUM_USERS_SUPPORTED];
-	XnCallbackHandle hUserCallbacks, hCalibrationCallbacks, hPoseCallbacks;
+	XnCallbackHandle hUserCallbacks, hCalibrationStartCallback, hCalibrationCompleteCallback, hPoseCallbacks;
 	XnChar strRequiredCalibrationPose[XN_MAX_NAME_LENGTH];
 	float fPositionConfidenceFilter, fOrientConfidenceFilter, fSkeletonSmoothingFactor;
 	char bOutputSkeletonOrientation, bOutputDepthmap, bOutputImagemap, bOutputIRmap, bOutputUserPixelsmap, bOutputSkeleton;
@@ -190,6 +192,7 @@ typedef void (* JitOpenNIEventHandler)(t_jit_openni *x, enum JitOpenNIEvents iEv
 // jit.openni.c
 t_jit_err		jit_openni_init(void); 
 t_jit_openni	*jit_openni_new(void *pParent);
+void			jit_openni_release_script_resources(t_jit_openni *x);
 void			jit_openni_free					(t_jit_openni *x);
 t_jit_err		jit_openni_skelsmooth_set		(t_jit_openni *x, void *attr, long ac, t_atom *av);
 void			jit_openni_init_from_xml		(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal);
@@ -204,7 +207,7 @@ void XN_CALLBACK_TYPE User_NewUser				(XnNodeHandle hUserGenerator, XnUserID use
 void XN_CALLBACK_TYPE User_LostUser				(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x);
 void XN_CALLBACK_TYPE UserPose_PoseDetected	(XnNodeHandle hPoseCapability, const XnChar *strPose, XnUserID userID, t_jit_openni *x);
 void XN_CALLBACK_TYPE UserCalibration_CalibrationStart(XnNodeHandle hSkeletonCapability, XnUserID userID, t_jit_openni *x);
-void XN_CALLBACK_TYPE UserCalibration_CalibrationEnd	(XnNodeHandle hSkeletonCapability, XnUserID userID, XnBool bSuccess, t_jit_openni *x);
+void XN_CALLBACK_TYPE UserCalibration_CalibrationComplete(XnNodeHandle hSkeletonCapability, XnUserID userID, XnCalibrationStatus calibrationResult, t_jit_openni *x);
 
 // max.jit.openni.c
 t_jit_err		jit_openni_init					(void);

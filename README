@@ -36,6 +36,12 @@ Build notes-----------
 - You will need to change the build's include and library directories to match
   the locations in the Max SDK and OpenNI SDK.
 
+v0.6.6---------
+- updated codebase to support OpenNI v1.3.2.3 and its deprecated APIs
+- cleanup of some user, pose, calibration event handling
+- added support for reloading XML config files on same jit.openni object
+- known issue: repeated reloading config file with USER node will eventually cause a crash
+
 v0.6.5---------
 - added 5 attributes which enable (default) or not the output for a given outlet; allows for decreasing resource utilization
 - corrected ordering of joint orientation output...I think...

@@ -182,8 +182,6 @@ t_jit_openni *jit_openni_new(void *pParent)
 		XnStatus nRetVal = XN_STATUS_OK;
 		x->pParent = pParent;
 		x->bHaveValidGeneratorProductionNode = false;
-		x->bNeedPose = false;
-		x->bHaveSkeletonSupport = false;
 		x->fPositionConfidenceFilter = 0.0;
 		x->fOrientConfidenceFilter = 0.0;
 		x->bOutputSkeletonOrientation = 0;
@@ -193,14 +191,12 @@ t_jit_openni *jit_openni_new(void *pParent)
 		x->bOutputUserPixelsmap = 1;
 		x->bOutputSkeleton = 1;
 		x->fSkeletonSmoothingFactor = 0.0;	//BUGBUG what is the OpenNI/NITE default?
-		x->pUserSkeletonJoints = NULL;
-		x->iNumUserSkeletonJoints = 0;
 		x->pEventCallbackFunctions = (t_jit_linklist *)jit_object_new(_jit_sym_jit_linklist);
 
-		LOG_DEBUG("Initializing OpenNI library");
+		LOG_DEBUG("Creating a new OpenNI context");
 		if (nRetVal = xnInit(&(x->pContext)))
 		{
-			LOG_ERROR("jit_openni_new: cannot initialize OpenNI");
+			LOG_ERROR("jit_openni_new: cannot create new OpenNI context");
 		}
 		else
 		{
@@ -209,30 +205,69 @@ t_jit_openni *jit_openni_new(void *pParent)
 			x->pMapMetaData[IRMAP_OUTPUT_INDEX] = (XnMapMetaData *)xnAllocateIRMetaData();
 			x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX] = (XnMapMetaData *)xnAllocateSceneMetaData();
 		}
-	} 
-	LOG_DEBUG("object created");
+		LOG_DEBUG("object created");
+	}
 	return x;
 }
 
+void jit_openni_release_script_resources(t_jit_openni *x)
+{
+	int i;
+
+	if (x->hUserCallbacks)
+	{
+		xnUnregisterUserCallbacks(x->hProductionNode[USER_GEN_INDEX], x->hUserCallbacks);
+		x->hUserCallbacks = NULL;
+	}
+	if (x->hPoseCallbacks)
+	{
+		xnUnregisterFromPoseDetected(x->hProductionNode[USER_GEN_INDEX], x->hPoseCallbacks);
+		x->hPoseCallbacks = NULL;
+	}
+	if (x->hCalibrationStartCallback)
+	{
+		xnUnregisterFromCalibrationStart(x->hProductionNode[USER_GEN_INDEX], x->hCalibrationStartCallback);
+		x->hCalibrationStartCallback = NULL;
+	}
+	if (x->hCalibrationCompleteCallback)
+	{
+		xnUnregisterFromCalibrationComplete(x->hProductionNode[USER_GEN_INDEX], x->hCalibrationCompleteCallback);
+		x->hCalibrationCompleteCallback = NULL;
+	}
+	if (x->pUserSkeletonJoints)
+	{
+		sysmem_freeptr(x->pUserSkeletonJoints);		//BUGBUG this is not thread safe, matrix_calc could be running elsewhere
+		x->pUserSkeletonJoints = NULL;
+	}
+	for (i=0; i<NUM_OPENNI_GENERATORS; i++)			// TODO consider moving away from the node array below and use xnEnumerateExistingNodes() instead
+	{
+		if (x->hProductionNode[i])
+		{
+			xnProductionNodeRelease(x->hProductionNode[i]);	// due to xnNodeInfoGetRefHandle() have to free them here
+			x->hProductionNode[i] = NULL;
+		}
+	}
+	if (x->hScriptNode)
+	{
+		xnProductionNodeRelease(x->hScriptNode);			//BUGBUG this is not thread safe, matrix_calc could be running elsewhere
+		x->hScriptNode = NULL;
+	}
+	LOG_DBGVIEW("Just released script resources");
+}
 
 void jit_openni_free(t_jit_openni *x)
 {
-	XnStatus nRetVal = XN_STATUS_OK;
-
-	if (x->pContext) nRetVal = xnStopGeneratingAll(x->pContext);
-	CHECK_RC_ERROR_EXIT(nRetVal, "jit_openni_free(): cannot stop all generators");
-
-	xnFreeDepthMetaData((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX]);
-	xnFreeImageMetaData((XnImageMetaData *)x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX]);
-	xnFreeIRMetaData((XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX]);
-	xnFreeSceneMetaData((XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX]);
 	jit_object_free(x->pEventCallbackFunctions);
-	if (x->pUserSkeletonJoints) sysmem_freeptr(x->pUserSkeletonJoints);
-	if (x->pProductionNodeList) xnNodeInfoListFree(x->pProductionNodeList);
-	x->bHaveValidGeneratorProductionNode = false;
-	LOG_DEBUG("Shutting down OpenNI library");
-	xnShutdown(x->pContext);
-	LOG_DEBUG("object freed");
+	if (x->pContext)
+	{
+		jit_openni_release_script_resources(x);
+		xnFreeDepthMetaData((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX]);
+		xnFreeImageMetaData((XnImageMetaData *)x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX]);
+		xnFreeIRMetaData((XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX]);
+		xnFreeSceneMetaData((XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX]);
+		LOG_DEBUG("Releasing OpenNI context...");
+		xnContextRelease(x->pContext);
+	}
 }
 
 t_jit_err jit_openni_skelsmooth_set(t_jit_openni *x, void *attr, long ac, t_atom *av)
@@ -529,15 +564,23 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 	//XnStatus nRetVal = XN_STATUS_OK; TODO remove this
 	XnNodeInfoListIterator pCurrentNode;
 	XnNodeInfo* pProdNodeInfo;
+	XnNodeInfoList* pProductionNodeList;
+
+	// release all previous script generated resources
+	jit_openni_release_script_resources(x);
+
+	// prep for new XML config load
+	x->bHaveValidGeneratorProductionNode = false;
+	x->bNeedPose = false;
+	x->bHaveSkeletonSupport = false;
+	x->iNumUserSkeletonJoints = 0;
 
 	*nRetVal = xnEnumerationErrorsAllocate(&pErrors);
 	CHECK_RC_ERROR_EXIT(*nRetVal, "jit_openni_init_from_xml: cannot allocate errors object");
 
-	*nRetVal = xnStopGeneratingAll(x->pContext);		// should stop generators in case we are loading a new XML file
-	CHECK_RC_ERROR_EXIT(*nRetVal, "jit_openni_init_from_xml: cannot stop all generators before loading XML config");
+	// load new XML config file, BUGBUG repeatedly unloading and reloading a script with a USER node will eventually cause a crash
+	*nRetVal = xnContextRunXmlScriptFromFileEx(x->pContext, s->s_name, pErrors, &(x->hScriptNode));
 
-	*nRetVal = xnContextRunXmlScriptFromFile(x->pContext, s->s_name, pErrors);	// BUGBUG this doesn't seem to support loading a 2nd XML file
-																				// may need to iterate xnProductionNodeRelease() or xnShutdown()
 	if (*nRetVal == XN_STATUS_NO_NODE_PRESENT)
 	{
 		XnChar strError[1024];
@@ -551,9 +594,9 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 	}
 	LOG_DEBUG2("XMLconfig loaded: %s", s->s_name);
 
-	*nRetVal = xnEnumerateExistingNodes(x->pContext,&x->pProductionNodeList);
+	*nRetVal = xnEnumerateExistingNodes(x->pContext,&pProductionNodeList);
 	CHECK_RC_ERROR_EXIT(*nRetVal, "XMLconfig cannot enumerate existing production nodes");
-	for (pCurrentNode = xnNodeInfoListGetFirst(x->pProductionNodeList); xnNodeInfoListIteratorIsValid(pCurrentNode); pCurrentNode = xnNodeInfoListGetNext(pCurrentNode))
+	for (pCurrentNode = xnNodeInfoListGetFirst(pProductionNodeList); xnNodeInfoListIteratorIsValid(pCurrentNode); pCurrentNode = xnNodeInfoListGetNext(pCurrentNode))
 	{
 		pProdNodeInfo = xnNodeInfoListGetCurrent(pCurrentNode);
 		LOG_DEBUG2("found prodnode type=%s", xnProductionNodeTypeToString(xnNodeInfoGetDescription(pProdNodeInfo)->Type));
@@ -562,9 +605,10 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 		switch(xnNodeInfoGetDescription(pProdNodeInfo)->Type)
 		{
 		case XN_NODE_TYPE_DEVICE:
+		case XN_NODE_TYPE_SCRIPT:
 			break;
 		case XN_NODE_TYPE_DEPTH:
-			x->hProductionNode[DEPTH_GEN_INDEX] = xnNodeInfoGetHandle(pProdNodeInfo);
+			x->hProductionNode[DEPTH_GEN_INDEX] = xnNodeInfoGetRefHandle(pProdNodeInfo);
 			xnGetDepthMetaData(x->hProductionNode[DEPTH_GEN_INDEX], (XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX]);
 			x->bHaveValidGeneratorProductionNode = true;
 #ifdef _DEBUG
@@ -592,17 +636,17 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 #endif
 			break;
 		case XN_NODE_TYPE_IMAGE:
-			x->hProductionNode[IMAGE_GEN_INDEX] = xnNodeInfoGetHandle(pProdNodeInfo);
+			x->hProductionNode[IMAGE_GEN_INDEX] = xnNodeInfoGetRefHandle(pProdNodeInfo);
 			xnGetImageMetaData(x->hProductionNode[IMAGE_GEN_INDEX], (XnImageMetaData *)x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX]);
 			x->bHaveValidGeneratorProductionNode = true;
 			break;
 		case XN_NODE_TYPE_IR:
-			x->hProductionNode[IR_GEN_INDEX] = xnNodeInfoGetHandle(pProdNodeInfo);
+			x->hProductionNode[IR_GEN_INDEX] = xnNodeInfoGetRefHandle(pProdNodeInfo);
 			xnGetIRMetaData(x->hProductionNode[IR_GEN_INDEX], (XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX]);
 			x->bHaveValidGeneratorProductionNode = true;
 			break;
 		case XN_NODE_TYPE_USER:
-			x->hProductionNode[USER_GEN_INDEX] = xnNodeInfoGetHandle(pProdNodeInfo);
+			x->hProductionNode[USER_GEN_INDEX] = xnNodeInfoGetRefHandle(pProdNodeInfo);
 			xnRegisterUserCallbacks(x->hProductionNode[USER_GEN_INDEX], User_NewUser, User_LostUser, x, &(x->hUserCallbacks));
 			xnGetUserPixels(x->hProductionNode[USER_GEN_INDEX], 0, (XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX]);
 			x->bHaveValidGeneratorProductionNode = true;
@@ -617,7 +661,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 						if (xnIsCapabilitySupported(x->hProductionNode[USER_GEN_INDEX], XN_CAPABILITY_POSE_DETECTION))
 						{
 							LOG_DEBUG2("user generator supports %u poses", xnGetNumberOfPoses(x->hProductionNode[USER_GEN_INDEX]));
-							xnRegisterToPoseCallbacks(x->hProductionNode[USER_GEN_INDEX], UserPose_PoseDetected, NULL, x, &(x->hPoseCallbacks));
+							xnRegisterToPoseDetected(x->hProductionNode[USER_GEN_INDEX], UserPose_PoseDetected, x, &(x->hPoseCallbacks)); 
 							xnGetSkeletonCalibrationPose(x->hProductionNode[USER_GEN_INDEX], x->strRequiredCalibrationPose);
 							x->bNeedPose = true;
 							x->bHaveSkeletonSupport = true;
@@ -634,7 +678,8 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 					if (x->bHaveSkeletonSupport)
 					{
 						xnSetSkeletonProfile(x->hProductionNode[USER_GEN_INDEX], XN_SKEL_PROFILE_ALL);
-						xnRegisterCalibrationCallbacks(x->hProductionNode[USER_GEN_INDEX], UserCalibration_CalibrationStart, UserCalibration_CalibrationEnd, x, &(x->hCalibrationCallbacks));
+						xnRegisterToCalibrationStart(x->hProductionNode[USER_GEN_INDEX], UserCalibration_CalibrationStart, x, &(x->hCalibrationStartCallback));
+						xnRegisterToCalibrationComplete(x->hProductionNode[USER_GEN_INDEX], UserCalibration_CalibrationComplete, x, &(x->hCalibrationCompleteCallback));
 						x->pUserSkeletonJoints = (t_user_and_joints *)sysmem_newptr(sizeof(t_user_and_joints) * MAX_NUM_USERS_SUPPORTED);
 						xnSetSkeletonSmoothing(x->hProductionNode[USER_GEN_INDEX],x->fSkeletonSmoothingFactor);
 					}
@@ -651,9 +696,10 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 			}
 			break;
 		default:
-			LOG_ERROR2("found unsupported node type", xnProductionNodeTypeToString(xnNodeInfoGetDescription(pProdNodeInfo)->Type));
+			LOG_DEBUG2("found unsupported node type", xnProductionNodeTypeToString(xnNodeInfoGetDescription(pProdNodeInfo)->Type));
 		}
 	}
+	xnNodeInfoListFree(pProductionNodeList);
 	LOG_DEBUG2("bHaveValidGeneratorProductionNode=%s", (x->bHaveValidGeneratorProductionNode ? "true": "false"));
 
 	*nRetVal = xnStartGeneratingAll(x->pContext);
@@ -801,31 +847,36 @@ void makeCallbacks(t_jit_openni *x, enum JitOpenNIEvents iEventType, XnUserID us
 // Callback: New user was detected
 void XN_CALLBACK_TYPE User_NewUser(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x)
 {
+	if (x->bHaveSkeletonSupport)
+	{
+		if (x->bNeedPose)		// for now am restricting pose detection to only be the pose for skeleton detection
+		{
+			xnStartPoseDetection(hUserGenerator, x->strRequiredCalibrationPose, userID);
+		}
+		else
+		{
+			xnRequestSkeletonCalibration(hUserGenerator, userID, true);
+		}
+	}
 	makeCallbacks(x, JITOPENNI_NEW_USER, userID);
-	// New user found
-	if (x->bNeedPose)
-	{
-		xnStartPoseDetection(hUserGenerator, x->strRequiredCalibrationPose, userID);
-	}
-	else
-	{
-		xnRequestSkeletonCalibration(hUserGenerator, userID, true);
-	}
 }
 
 // Callback: An existing user was lost
 void XN_CALLBACK_TYPE User_LostUser(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x)
 {
-	xnStopPoseDetection(hUserGenerator, userID);
+	if (x->bNeedPose) xnStopPoseDetection(hUserGenerator, userID);
 	makeCallbacks(x, JITOPENNI_LOST_USER, userID);
 }
 
 // Callback: Detected a pose
 void XN_CALLBACK_TYPE UserPose_PoseDetected(XnNodeHandle hPoseCapability, const XnChar *strPose, XnUserID userID, t_jit_openni *x)
 {
-	makeCallbacks(x, JITOPENNI_CALIB_POSE_DETECTED, userID);
 	xnStopPoseDetection(hPoseCapability, userID);
-	xnRequestSkeletonCalibration(hPoseCapability, userID, true);
+	if (strcmp(x->strRequiredCalibrationPose, strPose) == 0)
+	{
+		xnRequestSkeletonCalibration(hPoseCapability, userID, true);
+	}
+	makeCallbacks(x, JITOPENNI_CALIB_POSE_DETECTED, userID);
 }
 
 // Callback: Started calibration
@@ -835,25 +886,28 @@ void XN_CALLBACK_TYPE UserCalibration_CalibrationStart(XnNodeHandle hSkeletonCap
 }
 
 // Callback: Finished calibration
-void XN_CALLBACK_TYPE UserCalibration_CalibrationEnd(XnNodeHandle hSkeletonCapability, XnUserID userID, XnBool bSuccess, t_jit_openni *x)
+void XN_CALLBACK_TYPE UserCalibration_CalibrationComplete(XnNodeHandle hSkeletonCapability, XnUserID userID, XnCalibrationStatus calibrationResult, t_jit_openni *x)
 {
-	if (bSuccess)
+	if (calibrationResult == XN_CALIBRATION_STATUS_OK)
 	{
 		// Calibration succeeded
-		makeCallbacks(x, JITOPENNI_CALIB_SUCCESS, userID);
 		xnStartSkeletonTracking(hSkeletonCapability, userID);
+		makeCallbacks(x, JITOPENNI_CALIB_SUCCESS, userID);
 	}
 	else
 	{
 		// Calibration failed
+		if (x->bHaveSkeletonSupport)
+		{
+			if (x->bNeedPose)		// for now am restricting pose detection to only be the pose for skeleton detection
+			{
+				xnStartPoseDetection(hSkeletonCapability, x->strRequiredCalibrationPose, userID);
+			}
+			else
+			{
+				xnRequestSkeletonCalibration(hSkeletonCapability, userID, true);
+			}
+		}
 		makeCallbacks(x, JITOPENNI_CALIB_FAIL, userID);
-		if (x->bNeedPose)
-		{
-			xnStartPoseDetection(hSkeletonCapability, x->strRequiredCalibrationPose, userID);
-		}
-		else
-		{
-			xnRequestSkeletonCalibration(hSkeletonCapability, userID, true);
-		}
 	}
 }
