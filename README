@@ -36,6 +36,9 @@ Build notes-----------
 - You will need to change the build's include and library directories to match
   the locations in the Max SDK and OpenNI SDK.
 
+v0.6.7---------
+- added skeleton_format attribute to support output in 0=native jit.openni OSC, 1=max route-able message format, or 2=OSCeleton default format (with raw kinect values)
+
 v0.6.6---------
 - updated codebase to support OpenNI v1.3.2.3 and its deprecated APIs
 - cleanup of some user, pose, calibration event handling

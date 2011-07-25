@@ -45,7 +45,7 @@
 // Macros
 //---------------------------------------------------------------------------
 
-#define JIT_OPENNI_VERSION "v0.6.6"
+#define JIT_OPENNI_VERSION "v0.6.7"
 #define MAX_NUM_USERS_SUPPORTED 15		// I have not found an OpenNI API to determine the max number possible for user generators
 #define NUM_OF_SKELETON_JOINT_TYPES 24	// I have not found an OpenNI API to determine the number of joints types (head, left foot, etc.) for a user generator
 #define NUM_OPENNI_GENERATORS 4
@@ -67,7 +67,7 @@
 #define IMAGEMAP_ASSIST_TEXT "(matrix) imagemap generator"
 #define IRMAP_ASSIST_TEXT "(matrix) irmap generator"
 #define USERPIXELMAP_ASSIST_TEXT "(matrix) usermap generator"
-#define SKELETON_ASSIST_TEXT "(OSC) skeleton"
+#define SKELETON_ASSIST_TEXT "(message) skeleton"
 
 #define NUM_JITOPENNI_OUTPUTS (NUM_OPENNI_MAPS + NUM_OPENNI_MISC_OUTPUTS)	// this is the total number of outputs on the jit.open external not counting dumpout.
 
@@ -148,6 +148,7 @@ typedef struct _max_jit_openni {
 	void		*obex;
 	t_object	*osc_outlet;
 	void		*pRegistrationForEvents;
+	char		chrSkeletonOutputFormat;
 } t_max_jit_openni;
 
 // enum JitOpenNIEvents must match the number/order of friendly string array defined in max.jit.openni.c

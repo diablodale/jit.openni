@@ -47,9 +47,11 @@ static char *strJointNames[] = { NULL,
 	"r_hip", "r_knee", "r_ankle", "r_foot"};
 #define MAX_LENGTH_STR_JOINT_NAME 11	// always keep the number of characters of the longest string in this group above
 
-// strOSCEvents[] must match the number/order of enum JitOpenNIEvents defined in jit.openni.h
-static char *strOSCEvents[] = { "/new_user", "/lost_user", "/calib_pose",
+// strSkeletonEvents[] must match the number/order of enum JitOpenNIEvents defined in jit.openni.h
+static char *strSkeletonEvents[] = { "/new_user", "/lost_user", "/calib_pose",
 	"/calib_start", "/calib_success", "/calib_fail"};
+static char *strOSCeletonEvents[] = { "/new_user", "/lost_user", "/pose_detected",
+	"/calibration_started", "/new_skel", "/calibration_failed"};
 
 
 /************************************************************************************/
@@ -57,6 +59,7 @@ static char *strOSCEvents[] = { "/new_user", "/lost_user", "/calib_pose",
 int main(void)
 {	
 	void *p, *q;
+	t_jit_object	*attr;
 	
 	post("jit.openni %s, Copyright (c) 2011 Dale Phurrough. This program comes with ABSOLUTELY NO WARRANTY.", JIT_OPENNI_VERSION);
 	post("jit.openni %s, Licensed under the GNU General Public License v3.0 (GPLv3) available at http://www.gnu.org/licenses/gpl-3.0.html", JIT_OPENNI_VERSION);
@@ -75,6 +78,12 @@ int main(void)
     
 	// add default methods and attributes for MOP max wrapper class, e.g. name, type, dim, planecount, bang, outputmatrix, etc
 	max_jit_classex_mop_wrap(p, q, MAX_JIT_MOP_FLAGS_OWN_OUTPUTMATRIX|MAX_JIT_MOP_FLAGS_OWN_JIT_MATRIX|MAX_JIT_MOP_FLAGS_OWN_ADAPT);
+
+	// add custom max wrapper attributes
+	attr = jit_object_new(_jit_sym_jit_attr_offset, "skeleton_format", _jit_sym_char, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW,
+			NULL, NULL, calcoffset(t_max_jit_openni, chrSkeletonOutputFormat));
+	jit_attr_addfilterset_clip(attr,0,2,TRUE,TRUE);
+	max_jit_classex_addattr(p, attr);
 
 	// wrap the Jitter class with the standard methods for Jitter objects, e.g. getattributes, dumpout, maxjitclassaddmethods, etc
 	max_jit_classex_standard_wrap(p, q, 0);
@@ -112,6 +121,7 @@ void *max_jit_openni_new(t_symbol *s, long argc, t_atom *argv)
 			max_jit_mop_setup(x);
 			max_jit_mop_inputs(x);
 			max_jit_mop_outputs(x);
+			x->chrSkeletonOutputFormat = 0;
 			max_jit_mop_matrix_args(x,argc,argv);
 
 			max_jit_attr_args(x, argc, argv); // process attribute arguments, like auto handling of @attribute's
@@ -302,10 +312,12 @@ void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 	void *mop = max_jit_obex_adornment_get(x,_jit_sym_jit_mop);
 	t_jit_openni *pJit_OpenNI = (t_jit_openni *)max_jit_obex_jitob_get(x);
 	t_jit_err err;	
-	t_atom osc_argv[14];
-	char osc_string[MAX_LENGTH_STR_JOINT_NAME + 9];	// max joint string + 9 "/skel/xx/"
+	t_atom osc_argv[16];			// max number of atoms/values after the message selector
+	char osc_string[MAX_LENGTH_STR_JOINT_NAME + 10];	// max joint string + 9 for "/skel/xx/" + terminating null
+	char *msg_selector_string;
 	int i, j, k;
-	
+	const char strFormatOutput[3][12] = { "/skel/%u/%s", "skel", "/joint" };		// switchable skeleton output format selectors
+		
 	LOG_DEBUG("starting custom outputmatrix()");
 	if (outputmode && mop)
 	{
@@ -336,31 +348,55 @@ void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 						( pJit_OpenNI->bOutputSkeletonOrientation ?
 						(pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.fConfidence >= pJit_OpenNI->fOrientConfidenceFilter) : true))
 				{
-					snprintf_zero(osc_string, MAX_LENGTH_STR_JOINT_NAME + 9, "/skel/%u/%s", pJit_OpenNI->pUserSkeletonJoints->userID, strJointNames[j]);
-					atom_setfloat(osc_argv, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.X);
-					atom_setfloat(osc_argv + 1, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.Y);
-					atom_setfloat(osc_argv + 2, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.Z);
-					atom_setfloat(osc_argv + 3, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.fConfidence);
-					if (pJit_OpenNI->bOutputSkeletonOrientation)
+					short iNumAtoms = 0;
+
+					switch (x->chrSkeletonOutputFormat)
+					{
+					case 0:	// default jit.openni skeleton output format "/skel/%u/%s"
+						snprintf_zero(osc_string, sizeof(osc_string), &(strFormatOutput[0][0]), pJit_OpenNI->pUserSkeletonJoints->userID, strJointNames[j]);
+						msg_selector_string = osc_string;
+						break;
+					case 1: // skeleton output "skel %u %s" to easily use with standard max route object
+						msg_selector_string = (char *)strFormatOutput[1];
+						atom_setlong(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints->userID);
+						atom_setsym(osc_argv + (iNumAtoms++), gensym(strJointNames[j]));
+						break;
+					case 2: // skeleton output "/joint %s %u" same format as OSCeleton's default output with no orientation and no OSCeleton's legacy "normalized" values
+						msg_selector_string = (char *)strFormatOutput[2];
+						atom_setsym(osc_argv + (iNumAtoms++), gensym(strJointNames[j]));
+						atom_setlong(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints->userID);
+						break;
+					}
+
+					atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.X);
+					atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.Y);
+					atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.Z);
+
+					if (x->chrSkeletonOutputFormat != 2)
+					{						
+						atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.fConfidence);
+					}
+
+					if (pJit_OpenNI->bOutputSkeletonOrientation && (x->chrSkeletonOutputFormat != 2))
 					{
 						// TODO need to verify I've extracted the correct direction vector for each joint's local axes
-						//for (k=0; k<9; k++) atom_setfloat(osc_argv + 4 + k, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.orientation.elements[k]);
+						//for (k=0; k<9; k++) atom_setfloat(osc_argv + iAtomOffset + 4 + k, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.orientation.elements[k]);
 						for (k=0; k<3; k++)
 						{
-							atom_setfloat(osc_argv + 4 + (k*3), pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.orientation.elements[k]);
-							atom_setfloat(osc_argv + 4 + (k*3) + 1, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.orientation.elements[k+3]);
-							atom_setfloat(osc_argv + 4 + (k*3) + 2, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.orientation.elements[k+6]);
+							atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.orientation.elements[k]);
+							atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.orientation.elements[k+3]);
+							atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.orientation.elements[k+6]);
 						}
-						atom_setfloat(osc_argv + 13, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.fConfidence);
-						outlet_anything(x->osc_outlet, gensym(osc_string), 14, osc_argv);
+						if (x->chrSkeletonOutputFormat != 2)
+						{
+							atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.fConfidence);
+						}
 					}
-					else
-					{
-						outlet_anything(x->osc_outlet, gensym(osc_string), 4, osc_argv);
-					}
+					outlet_anything(x->osc_outlet, gensym(msg_selector_string), iNumAtoms, osc_argv);
 				}
 			}
 		}
+
 		LOG_DEBUG("now calling outputmatrix()");
 		max_jit_mop_outputmatrix(x);
 		LOG_DEBUG("called outputmatrix()");
@@ -372,5 +408,12 @@ void max_jit_openni_post_events(t_jit_openni *x, enum JitOpenNIEvents iEventType
 	t_atom osc_argv;
 
 	atom_setlong(&osc_argv, userID);
-	outlet_anything(((t_max_jit_openni *)(x->pParent))->osc_outlet, gensym(strOSCEvents[iEventType]), 1, &osc_argv);
+	if (((t_max_jit_openni *)(x->pParent))->chrSkeletonOutputFormat == 2)	// if in OSCeleton legacy format
+	{
+		outlet_anything(((t_max_jit_openni *)(x->pParent))->osc_outlet, gensym(strOSCeletonEvents[iEventType]), 1, &osc_argv);
+	}
+	else	// all other native formats
+	{
+		outlet_anything(((t_max_jit_openni *)(x->pParent))->osc_outlet, gensym(strSkeletonEvents[iEventType]), 1, &osc_argv);
+	}
 }
