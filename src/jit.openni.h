@@ -45,7 +45,7 @@
 // Macros
 //---------------------------------------------------------------------------
 
-#define JIT_OPENNI_VERSION "v0.6.7"
+#define JIT_OPENNI_VERSION "v0.6.9"
 #define MAX_NUM_USERS_SUPPORTED 15		// I have not found an OpenNI API to determine the max number possible for user generators
 #define NUM_OF_SKELETON_JOINT_TYPES 24	// I have not found an OpenNI API to determine the number of joints types (head, left foot, etc.) for a user generator
 #define NUM_OPENNI_GENERATORS 4
@@ -148,7 +148,7 @@ typedef struct _max_jit_openni {
 	void		*obex;
 	t_object	*osc_outlet;
 	void		*pRegistrationForEvents;
-	char		chrSkeletonOutputFormat;
+	char		chrSkeletonOutputFormat, chrOSCeletonRaw;
 } t_max_jit_openni;
 
 // enum JitOpenNIEvents must match the number/order of friendly string array defined in max.jit.openni.c
@@ -157,12 +157,16 @@ enum JitOpenNIEvents {	JITOPENNI_NEW_USER,
 						JITOPENNI_CALIB_POSE_DETECTED,
 						JITOPENNI_CALIB_START,
 						JITOPENNI_CALIB_SUCCESS,
-						JITOPENNI_CALIB_FAIL
+						JITOPENNI_CALIB_FAIL,
+						JITOPENNI_EXIT_USER,
+						JITOPENNI_REENTER_USER
 };
 
 typedef struct user_and_joints {
+	short bUserSkeletonTracked;
 	XnUserID userID;
 	XnSkeletonJointTransformation jointTransform[NUM_OF_SKELETON_JOINT_TYPES];
+	XnPoint3D userCoM;
 } t_user_and_joints;
 
 // Our Jitter object instance data
@@ -175,11 +179,11 @@ typedef struct _jit_openni {
 	boolean bHaveValidGeneratorProductionNode, bNeedPose, bHaveSkeletonSupport;
 	XnMapMetaData *pMapMetaData[NUM_OPENNI_MAPS];
 	XnUserID aUserIDs[MAX_NUM_USERS_SUPPORTED];
-	XnCallbackHandle hUserCallbacks, hCalibrationStartCallback, hCalibrationCompleteCallback, hPoseCallbacks;
+	XnCallbackHandle hUserCallbacks, hCalibrationStartCallback, hCalibrationCompleteCallback, hPoseCallbacks, hUserExitCallback, hUserReEnterCallback;
 	XnChar strRequiredCalibrationPose[XN_MAX_NAME_LENGTH];
 	float fPositionConfidenceFilter, fOrientConfidenceFilter, fSkeletonSmoothingFactor;
 	char bOutputSkeletonOrientation, bOutputDepthmap, bOutputImagemap, bOutputIRmap, bOutputUserPixelsmap, bOutputSkeleton;
-	short iNumUserSkeletonJoints;
+	short iNumUsersSeen;
 	t_user_and_joints *pUserSkeletonJoints;
 	t_jit_linklist *pEventCallbackFunctions;
 } t_jit_openni;
@@ -209,6 +213,9 @@ void XN_CALLBACK_TYPE User_LostUser				(XnNodeHandle hUserGenerator, XnUserID us
 void XN_CALLBACK_TYPE UserPose_PoseDetected	(XnNodeHandle hPoseCapability, const XnChar *strPose, XnUserID userID, t_jit_openni *x);
 void XN_CALLBACK_TYPE UserCalibration_CalibrationStart(XnNodeHandle hSkeletonCapability, XnUserID userID, t_jit_openni *x);
 void XN_CALLBACK_TYPE UserCalibration_CalibrationComplete(XnNodeHandle hSkeletonCapability, XnUserID userID, XnCalibrationStatus calibrationResult, t_jit_openni *x);
+void XN_CALLBACK_TYPE User_Exit					(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x);
+void XN_CALLBACK_TYPE User_ReEnter				(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x);
+
 
 // max.jit.openni.c
 t_jit_err		jit_openni_init					(void);

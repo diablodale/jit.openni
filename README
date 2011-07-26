@@ -36,6 +36,13 @@ Build notes-----------
 - You will need to change the build's include and library directories to match
   the locations in the Max SDK and OpenNI SDK.
 
+v0.6.9---------
+- added user center of mass output "/user" on the skeleton outlet; completes OSCeleton emulation + exposes the data to the native output formats
+- known issue: OpenNI center of mass values "/user" are unreliable and it is difficult to detect when they are unreliable; /user_exit and /user_reenter can assist but are also unreliable
+- added attribute osceleton_legacy_raw to determine output value ranges when attribute skeleton_format=2 (aka legacy OSCeleton output)
+- For osceleton_legacy_raw: 0 (default)=OSCeleton legacy "normalized" values, 1=OpenNI (aka Kinect) raw values same as -xr switch on OSCeleton
+= fixed output bug introduced in private build v0.6.7 that only appeared if you were tracking 2 or more skeletons
+
 v0.6.7---------
 - added skeleton_format attribute to support output in 0=native jit.openni OSC, 1=max route-able message format, or 2=OSCeleton default format (with raw kinect values)
 

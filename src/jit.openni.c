@@ -234,6 +234,16 @@ void jit_openni_release_script_resources(t_jit_openni *x)
 		xnUnregisterFromCalibrationComplete(x->hProductionNode[USER_GEN_INDEX], x->hCalibrationCompleteCallback);
 		x->hCalibrationCompleteCallback = NULL;
 	}
+	if (x->hUserExitCallback)
+	{
+		xnUnregisterFromUserExit(x->hProductionNode[USER_GEN_INDEX], x->hUserExitCallback);
+		x->hUserExitCallback = NULL;
+	}
+	if (x->hUserReEnterCallback)
+	{
+		xnUnregisterFromUserReEnter(x->hProductionNode[USER_GEN_INDEX], x->hUserReEnterCallback);
+		x->hUserReEnterCallback = NULL;
+	}
 	if (x->pUserSkeletonJoints)
 	{
 		sysmem_freeptr(x->pUserSkeletonJoints);		//BUGBUG this is not thread safe, matrix_calc could be running elsewhere
@@ -323,7 +333,6 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 			out_savelock[i] = (long) jit_object_method(out_matrix[i],_jit_sym_lock,1);
 		}
 
-		x->iNumUserSkeletonJoints = 0;	// invalidate all old skeletons, this allows max wrapper logic to work if we have bOutputSkeleton=false
 		// Don't wait for new data, just update all generators with the newest already available
 		nRetVal = xnWaitNoneUpdateAll(x->pContext);
 		if (nRetVal != XN_STATUS_OK)
@@ -334,6 +343,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 		else
 		{
 			LOG_DEBUG("updated generators and metadata, wait for none");
+			x->iNumUsersSeen = 0;	// invalidate all old skeletons, this allows max wrapper logic to work if we have bOutputSkeleton=false
 			for (i = 0; i< NUM_OPENNI_GENERATORS; i++)
 			{
 				// TODO this could instead look at productionNode and for the ones that are generators, do the following matrix setup/resizing
@@ -366,27 +376,26 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 						if (err = changeMatrixOutputGivenMapMetaData(x->pMapMetaData[IRMAP_OUTPUT_INDEX], &out_minfo)) goto out;
 						break;
 					case XN_NODE_TYPE_USER:
-						if (x->bHaveSkeletonSupport && x->bOutputSkeleton)
+						xnGetUsers(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs, &tmpNumUsers);
+						LOG_DEBUG2("Current num of users=%d", tmpNumUsers);
+						for (j=0; j<tmpNumUsers; j++)
 						{
-							xnGetUsers(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs, &tmpNumUsers);
-							LOG_DEBUG2("Current num of users=%d", tmpNumUsers);
-							for (j=0; j<tmpNumUsers; j++)
-							{
-								int iJoint;
+							int iJoint;
 
-								LOG_DEBUG3("user[%d]=%d", j, x->aUserIDs[j]);
-								if (xnIsSkeletonTracking(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs[j]))
+							LOG_DEBUG3("user[%d]=%d", j, x->aUserIDs[j]);
+							x->pUserSkeletonJoints[j].userID = x->aUserIDs[j];
+							x->pUserSkeletonJoints[j].bUserSkeletonTracked = xnIsSkeletonTracking(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs[j]);
+							xnGetUserCoM(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs[j], &(x->pUserSkeletonJoints[j].userCoM));
+							if (x->bHaveSkeletonSupport && x->bOutputSkeleton && x->pUserSkeletonJoints[j].bUserSkeletonTracked)
+							{
+								// fill in joint struct
+								for (iJoint = 1; iJoint <= NUM_OF_SKELETON_JOINT_TYPES; iJoint++)
 								{
-									// fill in user and joint struct
-									x->pUserSkeletonJoints[x->iNumUserSkeletonJoints].userID = x->aUserIDs[j];
-									for (iJoint = 1; iJoint <= NUM_OF_SKELETON_JOINT_TYPES; iJoint++)
-									{
-										xnGetSkeletonJoint(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs[j], (XnSkeletonJoint)iJoint, &(x->pUserSkeletonJoints[x->iNumUserSkeletonJoints].jointTransform[iJoint]));
-									}
-									x->iNumUserSkeletonJoints++;
+									xnGetSkeletonJoint(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs[j], (XnSkeletonJoint)iJoint, &(x->pUserSkeletonJoints[j].jointTransform[iJoint]));
 								}
 							}
 						}
+						x->iNumUsersSeen = tmpNumUsers;	// this and the code directly above are not multithread safe due to changing pUserSkeletonJoints structure without a mutex
 						if (!x->bOutputUserPixelsmap) continue;
 						xnGetUserPixels(x->hProductionNode[USER_GEN_INDEX], 0, (XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX]);
 						if (err = changeMatrixOutputGivenMapMetaData(x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX], &out_minfo)) goto out;
@@ -434,7 +443,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 			}
 		}
 out:
-		if (err) x->iNumUserSkeletonJoints = 0;		// invalidate skeletons if encountered an error
+		if (err) x->iNumUsersSeen = 0;		// invalidate skeletons if encountered an error
 		// restore matrix lock state to previous value
 		for (i = 0; i< NUM_OPENNI_MAPS; i++)
 		{
@@ -573,7 +582,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 	x->bHaveValidGeneratorProductionNode = false;
 	x->bNeedPose = false;
 	x->bHaveSkeletonSupport = false;
-	x->iNumUserSkeletonJoints = 0;
+	x->iNumUsersSeen = 0;
 
 	*nRetVal = xnEnumerationErrorsAllocate(&pErrors);
 	CHECK_RC_ERROR_EXIT(*nRetVal, "jit_openni_init_from_xml: cannot allocate errors object");
@@ -648,6 +657,8 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 		case XN_NODE_TYPE_USER:
 			x->hProductionNode[USER_GEN_INDEX] = xnNodeInfoGetRefHandle(pProdNodeInfo);
 			xnRegisterUserCallbacks(x->hProductionNode[USER_GEN_INDEX], User_NewUser, User_LostUser, x, &(x->hUserCallbacks));
+			xnRegisterToUserExit(x->hProductionNode[USER_GEN_INDEX], User_Exit, x, &(x->hUserExitCallback));
+			xnRegisterToUserReEnter(x->hProductionNode[USER_GEN_INDEX], User_ReEnter, x, &(x->hUserReEnterCallback));
 			xnGetUserPixels(x->hProductionNode[USER_GEN_INDEX], 0, (XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX]);
 			x->bHaveValidGeneratorProductionNode = true;
 
@@ -866,6 +877,18 @@ void XN_CALLBACK_TYPE User_LostUser(XnNodeHandle hUserGenerator, XnUserID userID
 {
 	if (x->bNeedPose) xnStopPoseDetection(hUserGenerator, userID);
 	makeCallbacks(x, JITOPENNI_LOST_USER, userID);
+}
+
+// Callback: An existing user exited the scene (but not lost yet)
+void XN_CALLBACK_TYPE User_Exit(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x)
+{
+	makeCallbacks(x, JITOPENNI_EXIT_USER, userID);
+}
+
+// Callback: An existing user re-entered the scene after exiting
+void XN_CALLBACK_TYPE User_ReEnter(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x)
+{
+	makeCallbacks(x, JITOPENNI_REENTER_USER, userID);
 }
 
 // Callback: Detected a pose
