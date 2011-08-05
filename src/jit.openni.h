@@ -45,7 +45,7 @@
 // Macros
 //---------------------------------------------------------------------------
 
-#define JIT_OPENNI_VERSION "v0.6.9"
+#define JIT_OPENNI_VERSION "v0.7.0"
 #define MAX_NUM_USERS_SUPPORTED 15		// I have not found an OpenNI API to determine the max number possible for user generators
 #define NUM_OF_SKELETON_JOINT_TYPES 24	// I have not found an OpenNI API to determine the number of joints types (head, left foot, etc.) for a user generator
 #define NUM_OPENNI_GENERATORS 4
@@ -148,7 +148,7 @@ typedef struct _max_jit_openni {
 	void		*obex;
 	t_object	*osc_outlet;
 	void		*pRegistrationForEvents;
-	char		chrSkeletonOutputFormat, chrOSCeletonRaw;
+	char		chrSkeletonOutputFormat;
 } t_max_jit_openni;
 
 // enum JitOpenNIEvents must match the number/order of friendly string array defined in max.jit.openni.c
@@ -182,7 +182,7 @@ typedef struct _jit_openni {
 	XnCallbackHandle hUserCallbacks, hCalibrationStartCallback, hCalibrationCompleteCallback, hPoseCallbacks, hUserExitCallback, hUserReEnterCallback;
 	XnChar strRequiredCalibrationPose[XN_MAX_NAME_LENGTH];
 	float fPositionConfidenceFilter, fOrientConfidenceFilter, fSkeletonSmoothingFactor;
-	char bOutputSkeletonOrientation, bOutputDepthmap, bOutputImagemap, bOutputIRmap, bOutputUserPixelsmap, bOutputSkeleton;
+	char bOutputSkeletonOrientation, bOutputDepthmap, bOutputImagemap, bOutputIRmap, bOutputUserPixelsmap, bOutputSkeleton, siSkeletonValueType;
 	short iNumUsersSeen;
 	t_user_and_joints *pUserSkeletonJoints;
 	t_jit_linklist *pEventCallbackFunctions;

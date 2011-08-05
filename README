@@ -36,6 +36,10 @@ Build notes-----------
 - You will need to change the build's include and library directories to match
   the locations in the Max SDK and OpenNI SDK.
 
+v0.7.0---------
+- removed the osceleton_legacy_raw and replaced it with the skeleton_value_type attribute
+- skeleton_value_type: 0 (default)=OpenNI native values, 1=OpenNI projective coordinates, 2=OSCeleton legacy "normalized" values
+
 v0.6.9---------
 - added user center of mass output "/user" on the skeleton outlet; completes OSCeleton emulation + exposes the data to the native output formats
 - known issue: OpenNI center of mass values "/user" are unreliable and it is difficult to detect when they are unreliable; /user_exit and /user_reenter can assist but are also unreliable

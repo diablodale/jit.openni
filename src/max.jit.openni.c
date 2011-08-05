@@ -84,10 +84,6 @@ int main(void)
 			NULL, NULL, calcoffset(t_max_jit_openni, chrSkeletonOutputFormat));
 	jit_attr_addfilterset_clip(attr,0,2,TRUE,TRUE);
 	max_jit_classex_addattr(p, attr);
-	attr = jit_object_new(_jit_sym_jit_attr_offset, "osceleton_legacy_raw", _jit_sym_char, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW,
-			NULL, NULL, calcoffset(t_max_jit_openni, chrOSCeletonRaw));
-	jit_attr_addfilterset_clip(attr,0,1,TRUE,TRUE);
-	max_jit_classex_addattr(p, attr);
 
 	// wrap the Jitter class with the standard methods for Jitter objects, e.g. getattributes, dumpout, maxjitclassaddmethods, etc
 	max_jit_classex_standard_wrap(p, q, 0);
@@ -126,7 +122,6 @@ void *max_jit_openni_new(t_symbol *s, long argc, t_atom *argv)
 			max_jit_mop_inputs(x);
 			max_jit_mop_outputs(x);
 			x->chrSkeletonOutputFormat = 0;
-			x->chrOSCeletonRaw = 0;
 			max_jit_mop_matrix_args(x,argc,argv);
 
 			max_jit_attr_args(x, argc, argv); // process attribute arguments, like auto handling of @attribute's
@@ -364,20 +359,9 @@ void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 				atom_setlong(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].userID);
 				break;
 			}
-			if ((x->chrSkeletonOutputFormat == 2) && (!x->chrOSCeletonRaw))	// if OSCeleton legacy with "normalized" values (not raw)
-			{
-				// I do not support the legacy OSCeleton multiplier and offset, if a dev is that advanced, they can do the simple conversion to this object's native output
-				// also, the "normalization" formula differs between here for CoM and the position; this is a legacy bug of OSCeleton so I replicate it here for compatibility
-				atom_setfloat(osc_argv + (iNumAtoms++), (float)((1280 - pJit_OpenNI->pUserSkeletonJoints[i].userCoM.X) / 2560));
-				atom_setfloat(osc_argv + (iNumAtoms++), (float)((1280 - pJit_OpenNI->pUserSkeletonJoints[i].userCoM.Y) / 2560));
-				atom_setfloat(osc_argv + (iNumAtoms++), (float)(pJit_OpenNI->pUserSkeletonJoints[i].userCoM.Z * 7.8125 / 10000));
-			}
-			else
-			{
-				atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].userCoM.X);
-				atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].userCoM.Y);
-				atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].userCoM.Z);
-			}
+			atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].userCoM.X);
+			atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].userCoM.Y);
+			atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].userCoM.Z);
 			outlet_anything(x->osc_outlet, gensym(msg_selector_string), iNumAtoms, osc_argv);
 
 			// output skeletons
@@ -408,20 +392,10 @@ void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 							atom_setlong(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].userID);
 							break;
 						}
-						if ((x->chrSkeletonOutputFormat == 2) && (!x->chrOSCeletonRaw))	// if OSCeleton legacy with "normalized" values (not raw)
-						{
-							// I do not support the legacy OSCeleton multiplier and offset, if a dev is that advanced, they can do the simple conversion to this object's native output
-							// also, the "normalization" formula differs between CoM and here for position; this is a legacy bug of OSCeleton so I replicate it here for compatibility
-							atom_setfloat(osc_argv + (iNumAtoms++), (1280 - pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.X) / 2560);	// "Normalize" coords to 0..1 interval
-							atom_setfloat(osc_argv + (iNumAtoms++), (960 - pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.Y) / 1920);	// "Normalize" coords to 0..1 interval
-							atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.Z * 7.8125 / 10000);	// "Normalize" coords to 0..7.8125 interval
-						}
-						else
-						{
-							atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.X);
-							atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.Y);
-							atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.Z);
-						}
+						atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.X);
+						atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.Y);
+						atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.position.Z);
+
 						if (x->chrSkeletonOutputFormat != 2)
 						{						
 							atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].position.fConfidence);

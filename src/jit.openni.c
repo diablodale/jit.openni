@@ -163,6 +163,11 @@ t_jit_err jit_openni_init(void)
 	jit_attr_addfilterset_clip(attr,0,1,TRUE,TRUE);
 	jit_class_addattr(s_jit_openni_class, attr);
 
+	attr = jit_object_new(_jit_sym_jit_attr_offset, "skeleton_value_type", _jit_sym_char, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW,
+			NULL, NULL, calcoffset(t_jit_openni, siSkeletonValueType));
+	jit_attr_addfilterset_clip(attr,0,2,TRUE,TRUE);
+	jit_class_addattr(s_jit_openni_class, attr);
+
 	// finalize class
 	jit_class_register(s_jit_openni_class);
 	return JIT_ERR_NONE;
@@ -191,6 +196,7 @@ t_jit_openni *jit_openni_new(void *pParent)
 		x->bOutputUserPixelsmap = 1;
 		x->bOutputSkeleton = 1;
 		x->fSkeletonSmoothingFactor = 0.0;	//BUGBUG what is the OpenNI/NITE default?
+		x->siSkeletonValueType = 0;
 		x->pEventCallbackFunctions = (t_jit_linklist *)jit_object_new(_jit_sym_jit_linklist);
 
 		LOG_DEBUG("Creating a new OpenNI context");
@@ -386,12 +392,38 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 							x->pUserSkeletonJoints[j].userID = x->aUserIDs[j];
 							x->pUserSkeletonJoints[j].bUserSkeletonTracked = xnIsSkeletonTracking(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs[j]);
 							xnGetUserCoM(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs[j], &(x->pUserSkeletonJoints[j].userCoM));
+							switch (x->siSkeletonValueType)  // case 0 is the default native OpenNI values (real world)
+							{
+							case 1:		// the OpenNI projective coordinates
+								xnConvertRealWorldToProjective(x->hProductionNode[DEPTH_GEN_INDEX], 1, &(x->pUserSkeletonJoints[j].userCoM), &(x->pUserSkeletonJoints[j].userCoM));
+								break;
+							case 2:		// legacy "normalized" OSCeleton values
+								// I do not support the legacy OSCeleton multiplier and offset, if a dev is that advanced, they can do the simple conversion to this object's native output
+								// also, the "normalization" formula differs between here for CoM and the position; this is a legacy bug of OSCeleton so I replicate it here for compatibility
+								x->pUserSkeletonJoints[j].userCoM.X = (1280 - x->pUserSkeletonJoints[j].userCoM.X) / 2560;
+								x->pUserSkeletonJoints[j].userCoM.Y = (1280 - x->pUserSkeletonJoints[j].userCoM.Y) / 2560;
+								x->pUserSkeletonJoints[j].userCoM.Z = x->pUserSkeletonJoints[j].userCoM.Z * 7.8125 / 10000;
+								break;
+							}
 							if (x->bHaveSkeletonSupport && x->bOutputSkeleton && x->pUserSkeletonJoints[j].bUserSkeletonTracked)
 							{
 								// fill in joint struct
 								for (iJoint = 1; iJoint <= NUM_OF_SKELETON_JOINT_TYPES; iJoint++)
 								{
 									xnGetSkeletonJoint(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs[j], (XnSkeletonJoint)iJoint, &(x->pUserSkeletonJoints[j].jointTransform[iJoint]));
+									switch (x->siSkeletonValueType) // case 0 is the default native OpenNI values (real world)
+									{
+									case 1:		// the OpenNI projective coordinates
+										xnConvertRealWorldToProjective(x->hProductionNode[DEPTH_GEN_INDEX], 1, &(x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position), &(x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position));
+										break;
+									case 2:		// legacy "normalized" OSCeleton values
+										// I do not support the legacy OSCeleton multiplier and offset, if a dev is that advanced, they can do the simple conversion to this object's native output
+										// also, the "normalization" formula differs between CoM and here for position; this is a legacy bug of OSCeleton so I replicate it here for compatibility
+										x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position.X = (1280 - x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position.X) / 2560;	// "Normalize" coords to 0..1 interval
+										x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position.Y = (960 - x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position.Y) / 1920;	// "Normalize" coords to 0..1 interval
+										x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position.Z = x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position.Z * 7.8125 / 10000;	// "Normalize" coords to 0..7.8125 interval
+										break;
+									}
 								}
 							}
 						}
@@ -570,7 +602,6 @@ void jit_openni_calculate_ndim(XnDepthMetaData *pMapMetaData, long dimcount, lon
 void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 {
 	XnEnumerationErrors* pErrors;
-	//XnStatus nRetVal = XN_STATUS_OK; TODO remove this
 	XnNodeInfoListIterator pCurrentNode;
 	XnNodeInfo* pProdNodeInfo;
 	XnNodeInfoList* pProductionNodeList;
@@ -607,6 +638,8 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 	CHECK_RC_ERROR_EXIT(*nRetVal, "XMLconfig cannot enumerate existing production nodes");
 	for (pCurrentNode = xnNodeInfoListGetFirst(pProductionNodeList); xnNodeInfoListIteratorIsValid(pCurrentNode); pCurrentNode = xnNodeInfoListGetNext(pCurrentNode))
 	{
+		XnFieldOfView xFieldOfView;
+		
 		pProdNodeInfo = xnNodeInfoListGetCurrent(pCurrentNode);
 		LOG_DEBUG2("found prodnode type=%s", xnProductionNodeTypeToString(xnNodeInfoGetDescription(pProdNodeInfo)->Type));
 		LOG_DEBUG2("Derived from map=%s", xnIsTypeDerivedFrom(xnNodeInfoGetDescription(pProdNodeInfo)->Type, XN_NODE_TYPE_MAP_GENERATOR) ? "true":"false");
@@ -621,6 +654,8 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 			xnGetDepthMetaData(x->hProductionNode[DEPTH_GEN_INDEX], (XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX]);
 			x->bHaveValidGeneratorProductionNode = true;
 #ifdef _DEBUG
+			xnGetDepthFieldOfView(x->hProductionNode[DEPTH_GEN_INDEX], &xFieldOfView);
+			LOG_DEBUG3("Depth FOV Horz=%f Vert=%f", xFieldOfView.fHFOV, xFieldOfView.fVFOV);
 			if (xnIsCapabilitySupported(x->hProductionNode[DEPTH_GEN_INDEX], XN_CAPABILITY_USER_POSITION))
 			{
 				unsigned int uUserPos, i;
