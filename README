@@ -36,6 +36,10 @@ Build notes-----------
 - You will need to change the build's include and library directories to match
   the locations in the Max SDK and OpenNI SDK.
 
+v0.7.1---------
+- performance improvement: no new OpenNI data -> don't get and transform old data
+- minor refactoring and perf changes in main matrix calc loop
+
 v0.7.0---------
 - removed the osceleton_legacy_raw and replaced it with the skeleton_value_type attribute
 - skeleton_value_type: 0 (default)=OpenNI native values, 1=OpenNI projective coordinates, 2=OSCeleton legacy "normalized" values

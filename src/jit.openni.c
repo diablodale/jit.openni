@@ -307,7 +307,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 	long out_savelock[NUM_OPENNI_MAPS];
 	t_jit_matrix_info out_minfo;
 	char *out_bp;	// char* so can reference down to a single byte as needed
-	long i, j, dimcount;
+	int i, j, dimcount;
 	void *out_matrix[NUM_OPENNI_MAPS];
 	boolean bGotOutMatrices = true;
 	XnStatus nRetVal = XN_STATUS_OK;
@@ -349,11 +349,8 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 		else
 		{
 			LOG_DEBUG("updated generators and metadata, wait for none");
-			x->iNumUsersSeen = 0;	// invalidate all old skeletons, this allows max wrapper logic to work if we have bOutputSkeleton=false
 			for (i = 0; i< NUM_OPENNI_GENERATORS; i++)
 			{
-				// TODO this could instead look at productionNode and for the ones that are generators, do the following matrix setup/resizing
-				// TODO adjust codebase to optionally allow no new matrices to be output for generators that have no new data
 				if (x->hProductionNode[i])
 				{
 					// fill out matrix info structs for input and output
@@ -361,9 +358,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 
 					LOG_DEBUG3("generator[%d] type=%s", i, xnProductionNodeTypeToString(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type));
 					LOG_DEBUG3("generator[%d] is derived from map=%s", i, xnIsTypeDerivedFrom(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type, XN_NODE_TYPE_MAP_GENERATOR) ? "true":"false");
-#ifdef _DEBUG
-					if (!xnIsDataNew(x->hProductionNode[i])) LOG_WARNING2("generator[%d] No new data", i); //TODO remove this debug once no new data->no new matrix output is implemented
-#endif
+					if (!xnIsDataNew(x->hProductionNode[i])) continue;
 					switch(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type)
 					{
 					case XN_NODE_TYPE_DEPTH:
@@ -382,52 +377,57 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 						if (err = changeMatrixOutputGivenMapMetaData(x->pMapMetaData[IRMAP_OUTPUT_INDEX], &out_minfo)) goto out;
 						break;
 					case XN_NODE_TYPE_USER:
-						xnGetUsers(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs, &tmpNumUsers);
-						LOG_DEBUG2("Current num of users=%d", tmpNumUsers);
-						for (j=0; j<tmpNumUsers; j++)
+						// next line invalidates all old skeletons, if I move this outside the for loop, then no new OSC data would be sent if no new User Generator data
+						x->iNumUsersSeen = 0;
+						if (x->bOutputSkeleton)
 						{
-							int iJoint;
+							xnGetUsers(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs, &tmpNumUsers);
+							LOG_DEBUG2("Current num of users=%d", tmpNumUsers);
+							for (j=0; j<tmpNumUsers; j++)
+							{
+								int iJoint;
 
-							LOG_DEBUG3("user[%d]=%d", j, x->aUserIDs[j]);
-							x->pUserSkeletonJoints[j].userID = x->aUserIDs[j];
-							x->pUserSkeletonJoints[j].bUserSkeletonTracked = xnIsSkeletonTracking(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs[j]);
-							xnGetUserCoM(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs[j], &(x->pUserSkeletonJoints[j].userCoM));
-							switch (x->siSkeletonValueType)  // case 0 is the default native OpenNI values (real world)
-							{
-							case 1:		// the OpenNI projective coordinates
-								xnConvertRealWorldToProjective(x->hProductionNode[DEPTH_GEN_INDEX], 1, &(x->pUserSkeletonJoints[j].userCoM), &(x->pUserSkeletonJoints[j].userCoM));
-								break;
-							case 2:		// legacy "normalized" OSCeleton values
-								// I do not support the legacy OSCeleton multiplier and offset, if a dev is that advanced, they can do the simple conversion to this object's native output
-								// also, the "normalization" formula differs between here for CoM and the position; this is a legacy bug of OSCeleton so I replicate it here for compatibility
-								x->pUserSkeletonJoints[j].userCoM.X = (1280 - x->pUserSkeletonJoints[j].userCoM.X) / 2560;
-								x->pUserSkeletonJoints[j].userCoM.Y = (1280 - x->pUserSkeletonJoints[j].userCoM.Y) / 2560;
-								x->pUserSkeletonJoints[j].userCoM.Z = x->pUserSkeletonJoints[j].userCoM.Z * 7.8125 / 10000;
-								break;
-							}
-							if (x->bHaveSkeletonSupport && x->bOutputSkeleton && x->pUserSkeletonJoints[j].bUserSkeletonTracked)
-							{
-								// fill in joint struct
-								for (iJoint = 1; iJoint <= NUM_OF_SKELETON_JOINT_TYPES; iJoint++)
+								LOG_DEBUG3("user[%d]=%d", j, x->aUserIDs[j]);
+								x->pUserSkeletonJoints[j].userID = x->aUserIDs[j];
+								x->pUserSkeletonJoints[j].bUserSkeletonTracked = xnIsSkeletonTracking(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs[j]);
+								xnGetUserCoM(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs[j], &(x->pUserSkeletonJoints[j].userCoM));
+								switch (x->siSkeletonValueType)  // case 0 is the default native OpenNI values (real world)
 								{
-									xnGetSkeletonJoint(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs[j], (XnSkeletonJoint)iJoint, &(x->pUserSkeletonJoints[j].jointTransform[iJoint]));
-									switch (x->siSkeletonValueType) // case 0 is the default native OpenNI values (real world)
+								case 1:		// the OpenNI projective coordinates
+									xnConvertRealWorldToProjective(x->hProductionNode[DEPTH_GEN_INDEX], 1, &(x->pUserSkeletonJoints[j].userCoM), &(x->pUserSkeletonJoints[j].userCoM));
+									break;
+								case 2:		// legacy "normalized" OSCeleton values
+									// I do not support the legacy OSCeleton multiplier and offset, if a dev is that advanced, they can do the simple conversion to this object's native output
+									// also, the "normalization" formula differs between here for CoM and the position; this is a legacy bug of OSCeleton so I replicate it here for compatibility
+									x->pUserSkeletonJoints[j].userCoM.X = (1280 - x->pUserSkeletonJoints[j].userCoM.X) / 2560;
+									x->pUserSkeletonJoints[j].userCoM.Y = (1280 - x->pUserSkeletonJoints[j].userCoM.Y) / 2560;
+									x->pUserSkeletonJoints[j].userCoM.Z = x->pUserSkeletonJoints[j].userCoM.Z * 7.8125 / 10000;
+									break;
+								}
+								if (x->bHaveSkeletonSupport && x->pUserSkeletonJoints[j].bUserSkeletonTracked)
+								{
+									// fill in joint struct
+									for (iJoint = 1; iJoint <= NUM_OF_SKELETON_JOINT_TYPES; iJoint++)
 									{
-									case 1:		// the OpenNI projective coordinates
-										xnConvertRealWorldToProjective(x->hProductionNode[DEPTH_GEN_INDEX], 1, &(x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position), &(x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position));
-										break;
-									case 2:		// legacy "normalized" OSCeleton values
-										// I do not support the legacy OSCeleton multiplier and offset, if a dev is that advanced, they can do the simple conversion to this object's native output
-										// also, the "normalization" formula differs between CoM and here for position; this is a legacy bug of OSCeleton so I replicate it here for compatibility
-										x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position.X = (1280 - x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position.X) / 2560;	// "Normalize" coords to 0..1 interval
-										x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position.Y = (960 - x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position.Y) / 1920;	// "Normalize" coords to 0..1 interval
-										x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position.Z = x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position.Z * 7.8125 / 10000;	// "Normalize" coords to 0..7.8125 interval
-										break;
+										xnGetSkeletonJoint(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs[j], (XnSkeletonJoint)iJoint, &(x->pUserSkeletonJoints[j].jointTransform[iJoint]));
+										switch (x->siSkeletonValueType) // case 0 is the default native OpenNI values (real world)
+										{
+										case 1:		// the OpenNI projective coordinates
+											xnConvertRealWorldToProjective(x->hProductionNode[DEPTH_GEN_INDEX], 1, &(x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position), &(x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position));
+											break;
+										case 2:		// legacy "normalized" OSCeleton values
+											// I do not support the legacy OSCeleton multiplier and offset, if a dev is that advanced, they can do the simple conversion to this object's native output
+											// also, the "normalization" formula differs between CoM and here for position; this is a legacy bug of OSCeleton so I replicate it here for compatibility
+											x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position.X = (1280 - x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position.X) / 2560;	// "Normalize" coords to 0..1 interval
+											x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position.Y = (960 - x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position.Y) / 1920;	// "Normalize" coords to 0..1 interval
+											x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position.Z = x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position.Z * 7.8125 / 10000;	// "Normalize" coords to 0..7.8125 interval
+											break;
+										}
 									}
 								}
 							}
+							x->iNumUsersSeen = tmpNumUsers;	// this and the code directly above are not multithread safe due to changing pUserSkeletonJoints structure without a mutex
 						}
-						x->iNumUsersSeen = tmpNumUsers;	// this and the code directly above are not multithread safe due to changing pUserSkeletonJoints structure without a mutex
 						if (!x->bOutputUserPixelsmap) continue;
 						xnGetUserPixels(x->hProductionNode[USER_GEN_INDEX], 0, (XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX]);
 						if (err = changeMatrixOutputGivenMapMetaData(x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX], &out_minfo)) goto out;
@@ -449,8 +449,6 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 						if (luFrameID != ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->nFrameID) LOG_ERROR("FrameIDs are not the same for all generators within a single update");
 					}
 #endif
-					LOG_DEBUG3("generator[%d] gotNew=%s", i, ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->bIsNew ? "true":"false"); // TODO remove this, output should match xnIsDataNew() above
-
 					jit_object_method(out_matrix[i], _jit_sym_setinfo, &out_minfo);	// after testing with max_jit_mop_notify(), setting info that is the same as the existing matrix does not trigger the modify or rebuild matrix functions
 					jit_object_method(out_matrix[i], _jit_sym_getinfo, &out_minfo);	// BUGBUG for some reason, I have to call this or Max crashes when you change matrix attributes via inspector
 #ifdef _DEBUG
@@ -525,7 +523,7 @@ t_jit_err changeMatrixOutputGivenMapMetaData(void *pMetaData, t_jit_matrix_info 
 
 void copy16BitDatatoJitterMatrix(XnDepthMetaData *pMapMetaData, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, long rowOffset)
 {
-	// this function assumes all parameters are valid, and requires that all map metadata's passed via pMapMetaData have the same byte location of the 	
+	// this function assumes all parameters are valid, and requires that all map metadata's passed via pMapMetaData have the same byte location for the data itself
 	
 	int i, j;
 	XnUInt16 *p16BitData; // aka XnDepthPixel or 16bit greysacale xnImagePixel
@@ -579,7 +577,7 @@ void jit_openni_calculate_ndim(XnDepthMetaData *pMapMetaData, long dimcount, lon
 						((unsigned long *)bp1)[j] = MAKEULONGFROMCHARS(0xFF, pMapData[0], pMapData[1], pMapData[2]); // not tested on big endian systems
 						pMapData += 3;
 						break;
-					case XN_PIXEL_FORMAT_YUV422:	// ordering is U, Y1, V, Y2; if I give up sources that are not 4-bte aligned, I could use Jitter matrix copying functions
+					case XN_PIXEL_FORMAT_YUV422:	// ordering is U, Y1, V, Y2; if I give up sources that are not 4-byte aligned, I could use Jitter matrix copying functions
 						((unsigned long *)bp1)[j] = MAKEULONGFROMCHARS(pMapData[0], pMapData[1], pMapData[2], pMapData[3]); // not tested on big endian systems
 						pMapData += 4;
 						break;
