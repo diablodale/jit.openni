@@ -170,9 +170,16 @@ t_jit_err jit_openni_init(void)
 
 	attr = jit_object_new(_jit_sym_jit_attr_offset_array, "depth_fov", _jit_sym_float32, 2, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW | JIT_ATTR_SET_OPAQUE | JIT_ATTR_SET_OPAQUE_USER,
 			(method)jit_openni_depthfov_get, NULL, NULL);
-	jit_attr_addfilterset_clip(attr,0,2,TRUE,TRUE);
 	jit_class_addattr(s_jit_openni_class, attr);
 
+	attr = jit_object_new(_jit_sym_jit_attr_offset, "output_scene_floor", _jit_sym_char, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW,
+			NULL, NULL, calcoffset(t_jit_openni, bOutputSceneFloor));
+	jit_attr_addfilterset_clip(attr,0,1,TRUE,TRUE);
+	jit_class_addattr(s_jit_openni_class, attr);
+	
+	attr = jit_object_new(_jit_sym_jit_attr_offset_array, "scene_floor", _jit_sym_float32, 6, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW | JIT_ATTR_SET_OPAQUE | JIT_ATTR_SET_OPAQUE_USER,
+			(method)jit_openni_scenefloor_get, NULL, NULL);
+	jit_class_addattr(s_jit_openni_class, attr);
 
 	// finalize class
 	jit_class_register(s_jit_openni_class);
@@ -201,6 +208,7 @@ t_jit_openni *jit_openni_new(void *pParent)
 		x->bOutputIRmap = 1;
 		x->bOutputUserPixelsmap = 1;
 		x->bOutputSkeleton = 1;
+		x->bOutputSceneFloor = 0;
 		x->fSkeletonSmoothingFactor = 0.0;	//BUGBUG what is the OpenNI/NITE default?
 		x->siSkeletonValueType = 0;
 		x->pEventCallbackFunctions = (t_jit_linklist *)jit_object_new(_jit_sym_jit_linklist);
@@ -384,6 +392,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 						break;
 					case XN_NODE_TYPE_SCENE:
 						// no need to xnGetSceneMetaData()
+						if (!x->bOutputSceneFloor) continue;
 						xnGetFloor(x->hProductionNode[i], &(x->planeFloor));
 						switch (x->siSkeletonValueType) // case 0 is the default native OpenNI values (real world)
 						{
@@ -1016,9 +1025,59 @@ t_jit_err jit_openni_depthfov_get(t_jit_openni *x, void *attr, long *ac, t_atom 
 			return JIT_ERR_OUT_OF_MEM;
 		}
 	}
+	if (x->hProductionNode[DEPTH_GEN_INDEX])
+	{
+		xnGetDepthFieldOfView(x->hProductionNode[DEPTH_GEN_INDEX], &xFieldOfView);
+		jit_atom_setfloat(*av, xFieldOfView.fHFOV);
+		jit_atom_setfloat((*av) + 1, xFieldOfView.fVFOV);
+	}
+	return JIT_ERR_NONE;
+}
 
-	xnGetDepthFieldOfView(x->hProductionNode[DEPTH_GEN_INDEX], &xFieldOfView);
-	jit_atom_setfloat(*av, xFieldOfView.fHFOV);
-	jit_atom_setfloat((*av) + 1, xFieldOfView.fVFOV);
+t_jit_err jit_openni_scenefloor_get(t_jit_openni *x, void *attr, long *ac, t_atom **av)
+{
+	XnPlane3D planeFloor;
+
+	if ((*ac)&&(*av))
+	{
+		//memory passed in, use it
+	}
+	else
+	{
+		//otherwise allocate memory
+		*ac = 6;
+		if (!(*av = (t_atom *)jit_getbytes(sizeof(t_atom)*(*ac))))
+		{
+			*ac = 0;
+			return JIT_ERR_OUT_OF_MEM;
+		}
+	}
+
+	if (x->hProductionNode[SCENE_GEN_INDEX])
+	{
+		// no need to xnGetSceneMetaData()
+		xnGetFloor(x->hProductionNode[SCENE_GEN_INDEX], &planeFloor);
+		switch (x->siSkeletonValueType) // case 0 is the default native OpenNI values (real world)
+		{
+		case 1:		// the OpenNI projective coordinates
+			xnConvertRealWorldToProjective(x->hProductionNode[DEPTH_GEN_INDEX], 1, &(planeFloor.ptPoint), &(planeFloor.ptPoint));
+			break;
+		case 2:		// legacy "normalized" OSCeleton values
+			// I do not support the legacy OSCeleton multiplier and offset, if a dev is that advanced, they can do the simple conversion to this object's native output
+			// also, the legacy OSCeleton "normalization" formula used here is the same as for OSCeleton joints. Note that OSCeleton has a legacy bug in that
+			// the "normalization" formulas for center of mass and joints differ. Since OSCeleton doesn't support floor data at all, I can only guess that a user
+			// might want to know when a foot joint is near the floor and therefore use the legacy OSCeleton joint normalization formula
+			planeFloor.ptPoint.X = (1280 - planeFloor.ptPoint.X) / 2560;	// "Normalize" coords to 0..1 interval
+			planeFloor.ptPoint.Y = (960 - planeFloor.ptPoint.Y) / 1920;	// "Normalize" coords to 0..1 interval
+			planeFloor.ptPoint.Z = planeFloor.ptPoint.Z * 7.8125 / 10000;	// "Normalize" coords to 0..7.8125 interval
+			break;
+		}
+		jit_atom_setfloat(*av, planeFloor.ptPoint.X);
+		jit_atom_setfloat((*av) + 1, planeFloor.ptPoint.Y);
+		jit_atom_setfloat((*av) + 2, planeFloor.ptPoint.Z);
+		jit_atom_setfloat((*av) + 3, planeFloor.vNormal.X);
+		jit_atom_setfloat((*av) + 4, planeFloor.vNormal.Y);
+		jit_atom_setfloat((*av) + 5, planeFloor.vNormal.Z);
+	}
 	return JIT_ERR_NONE;
 }

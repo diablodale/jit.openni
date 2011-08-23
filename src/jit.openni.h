@@ -45,7 +45,7 @@
 // Macros
 //---------------------------------------------------------------------------
 
-#define JIT_OPENNI_VERSION "v0.7.2"
+#define JIT_OPENNI_VERSION "v0.7.3"
 #define MAX_NUM_USERS_SUPPORTED 15		// I have not found an OpenNI API to determine the max number possible for user generators
 #define NUM_OF_SKELETON_JOINT_TYPES 24	// I have not found an OpenNI API to determine the number of joints types (head, left foot, etc.) for a user generator
 #define NUM_OPENNI_GENERATORS 5
@@ -183,7 +183,7 @@ typedef struct _jit_openni {
 	XnCallbackHandle hUserCallbacks, hCalibrationStartCallback, hCalibrationCompleteCallback, hPoseCallbacks, hUserExitCallback, hUserReEnterCallback;
 	XnChar strRequiredCalibrationPose[XN_MAX_NAME_LENGTH];
 	float fPositionConfidenceFilter, fOrientConfidenceFilter, fSkeletonSmoothingFactor;
-	char bOutputSkeletonOrientation, bOutputDepthmap, bOutputImagemap, bOutputIRmap, bOutputUserPixelsmap, bOutputSkeleton, siSkeletonValueType;
+	char bOutputSkeletonOrientation, bOutputDepthmap, bOutputImagemap, bOutputIRmap, bOutputUserPixelsmap, bOutputSkeleton, siSkeletonValueType, bOutputSceneFloor;
 	short iNumUsersSeen;
 	t_user_and_joints *pUserSkeletonJoints;
 	XnPlane3D planeFloor;
@@ -218,7 +218,7 @@ void XN_CALLBACK_TYPE UserCalibration_CalibrationComplete(XnNodeHandle hSkeleton
 void XN_CALLBACK_TYPE User_Exit					(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x);
 void XN_CALLBACK_TYPE User_ReEnter				(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x);
 t_jit_err jit_openni_depthfov_get				(t_jit_openni *x, void *attr, long *ac, t_atom **av);
-
+t_jit_err jit_openni_scenefloor_get				(t_jit_openni *x, void *attr, long *ac, t_atom **av);
 
 // max.jit.openni.c
 t_jit_err		jit_openni_init					(void);

@@ -344,7 +344,7 @@ void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 		}
 
 		// output floor from scene generator
-		if (pJit_OpenNI->hProductionNode[SCENE_GEN_INDEX])
+		if (pJit_OpenNI->hProductionNode[SCENE_GEN_INDEX] && pJit_OpenNI->bOutputSceneFloor)
 		{
 			msg_selector_string = (char *)strFloorFormatOutput[x->chrSkeletonOutputFormat];
 			atom_setfloat(&(osc_argv[0]), pJit_OpenNI->planeFloor.ptPoint.X);

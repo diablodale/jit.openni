@@ -36,6 +36,11 @@ Build notes-----------
 - You will need to change the build's include and library directories to match
   the locations in the Max SDK and OpenNI SDK.
 
+v0.7.3---------
+- Added attribute output_scene_floor which defaults to 0 (false). This controls the /floor data being output for each bang.
+- Added attribute scene_floor which contains the same scene floor values as would be output with the /floor message. Remember that
+  this attribute can be queried using standard Max messages like "getscene_floor" and its results will be output via dumpout outlet
+
 v0.7.2---------
 - Added floor location "/floor" from any configured scene analyzer. This is output from the "OSC" outlet in the configured skeleton_value_type.
   Values are a list of 6 floats: first 3 are the X, Y, Z coordinates for a point on the place, the second 3 are the X, Y, Z of a normal vector
