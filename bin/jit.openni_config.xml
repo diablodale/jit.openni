@@ -16,21 +16,13 @@
 	</Log>
 	<ProductionNodes startGenerating="true">
 		<!--<Recording file="c:\input_file.oni" />-->
-    <!--
-    <Node type="Image" name="Image1" stopOnError="false">
-      <Configuration>
-        <MapOutputMode xRes="1280" yRes="1024" FPS="15"/>
-        <Mirror on="true"/>
-      </Configuration>
-    </Node>
-    -->
-    
+
     <Node type="Image" name="Image1" stopOnError="false">
       <Configuration>
         <Mirror on="true"/>
       </Configuration>
     </Node>
-    
+
     <!--
     <Node type="IR" name="Ir1">
       <Configuration>
@@ -44,15 +36,22 @@
 		  <Configuration>
         <AlternativeViewPoint>Image1</AlternativeViewPoint>
         <Mirror on="true"/>
-		  </Configuration>
+        <!-- if you were to ever set a UserPosition optimization, the setting lives beyond your application -->
+        <!--
+        <UserPosition index="0"><Min x="0" y="0" z="500"/><Max x="639" y="479" z="3500"/></UserPosition>
+        <UserPosition index="1"><Min x="0" y="0" z="0"/><Max x="639" y="479" z="0"/></UserPosition>
+        <UserPosition index="2"><Min x="0" y="0" z="0"/><Max x="639" y="479" z="0"/></UserPosition>
+        <UserPosition index="3"><Min x="0" y="0" z="0"/><Max x="639" y="479" z="0"/></UserPosition>
+        -->
+      </Configuration>
 		</Node>
 
     <Node type="User" name="User1"/>
-
+    <Node type="Scene" name="Scene1"/>
+    
     <!--
     <Node type="Gesture" name="Gesture1"/>
     <Node type="Hands" name="Hands1"/>
-    <Node type="Scene" name="Scene1"/>
     -->
     
     <!-- codec names are defined in XnCodecIDs.h -->

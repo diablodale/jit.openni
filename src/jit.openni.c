@@ -168,6 +168,12 @@ t_jit_err jit_openni_init(void)
 	jit_attr_addfilterset_clip(attr,0,2,TRUE,TRUE);
 	jit_class_addattr(s_jit_openni_class, attr);
 
+	attr = jit_object_new(_jit_sym_jit_attr_offset_array, "depth_fov", _jit_sym_float32, 2, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW | JIT_ATTR_SET_OPAQUE | JIT_ATTR_SET_OPAQUE_USER,
+			(method)jit_openni_depthfov_get, NULL, NULL);
+	jit_attr_addfilterset_clip(attr,0,2,TRUE,TRUE);
+	jit_class_addattr(s_jit_openni_class, attr);
+
+
 	// finalize class
 	jit_class_register(s_jit_openni_class);
 	return JIT_ERR_NONE;
@@ -333,7 +339,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 	// if the object and both input and output matrices, both generators are valid, then process else error
 	if (x && bGotOutMatrices)
 	{
-		// lock input and output matrices TODO its possible to move this inside the below i through NUM_OPENNI_GENERATORS iteration if it is not important for all matrices to be locked before any work
+		// lock input and output matrices TODO its possible to move this inside the below iteration through NUM_OPENNI_GENERATORS (for those that have outlets) if it is not important for all matrices to be locked before any work
 		for (i = 0; i< NUM_OPENNI_MAPS; i++)
 		{
 			out_savelock[i] = (long) jit_object_method(out_matrix[i],_jit_sym_lock,1);
@@ -354,7 +360,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 				if (x->hProductionNode[i])
 				{
 					// fill out matrix info structs for input and output
-					jit_object_method(out_matrix[i],_jit_sym_getinfo,&out_minfo);
+					if (i < NUM_OPENNI_MAPS) jit_object_method(out_matrix[i],_jit_sym_getinfo,&out_minfo);
 
 					LOG_DEBUG3("generator[%d] type=%s", i, xnProductionNodeTypeToString(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type));
 					LOG_DEBUG3("generator[%d] is derived from map=%s", i, xnIsTypeDerivedFrom(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type, XN_NODE_TYPE_MAP_GENERATOR) ? "true":"false");
@@ -376,6 +382,25 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 						xnGetIRMetaData(x->hProductionNode[i], (XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX]);
 						if (err = changeMatrixOutputGivenMapMetaData(x->pMapMetaData[IRMAP_OUTPUT_INDEX], &out_minfo)) goto out;
 						break;
+					case XN_NODE_TYPE_SCENE:
+						// no need to xnGetSceneMetaData()
+						xnGetFloor(x->hProductionNode[i], &(x->planeFloor));
+						switch (x->siSkeletonValueType) // case 0 is the default native OpenNI values (real world)
+						{
+						case 1:		// the OpenNI projective coordinates
+							xnConvertRealWorldToProjective(x->hProductionNode[DEPTH_GEN_INDEX], 1, &(x->planeFloor.ptPoint), &(x->planeFloor.ptPoint));
+							break;
+						case 2:		// legacy "normalized" OSCeleton values
+							// I do not support the legacy OSCeleton multiplier and offset, if a dev is that advanced, they can do the simple conversion to this object's native output
+							// also, the legacy OSCeleton "normalization" formula used here is the same as for OSCeleton joints. Note that OSCeleton has a legacy bug in that
+							// the "normalization" formulas for center of mass and joints differ. Since OSCeleton doesn't support floor data at all, I can only guess that a user
+							// might want to know when a foot joint is near the floor and therefore use the legacy OSCeleton joint normalization formula
+							x->planeFloor.ptPoint.X = (1280 - x->planeFloor.ptPoint.X) / 2560;	// "Normalize" coords to 0..1 interval
+							x->planeFloor.ptPoint.Y = (960 - x->planeFloor.ptPoint.Y) / 1920;	// "Normalize" coords to 0..1 interval
+							x->planeFloor.ptPoint.Z = x->planeFloor.ptPoint.Z * 7.8125 / 10000;	// "Normalize" coords to 0..7.8125 interval
+							break;
+						}
+						continue;	// go to next generator because everything after the switch is map metadata code
 					case XN_NODE_TYPE_USER:
 						// next line invalidates all old skeletons, if I move this outside the for loop, then no new OSC data would be sent if no new User Generator data
 						x->iNumUsersSeen = 0;
@@ -687,6 +712,11 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 			xnGetIRMetaData(x->hProductionNode[IR_GEN_INDEX], (XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX]);
 			x->bHaveValidGeneratorProductionNode = true;
 			break;
+		case XN_NODE_TYPE_SCENE:
+			x->hProductionNode[SCENE_GEN_INDEX] = xnNodeInfoGetRefHandle(pProdNodeInfo);
+			// no need to xnGetSceneMetaData()
+			x->bHaveValidGeneratorProductionNode = true;
+			break;
 		case XN_NODE_TYPE_USER:
 			x->hProductionNode[USER_GEN_INDEX] = xnNodeInfoGetRefHandle(pProdNodeInfo);
 			xnRegisterUserCallbacks(x->hProductionNode[USER_GEN_INDEX], User_NewUser, User_LostUser, x, &(x->hUserCallbacks));
@@ -966,4 +996,29 @@ void XN_CALLBACK_TYPE UserCalibration_CalibrationComplete(XnNodeHandle hSkeleton
 		}
 		makeCallbacks(x, JITOPENNI_CALIB_FAIL, userID);
 	}
+}
+
+t_jit_err jit_openni_depthfov_get(t_jit_openni *x, void *attr, long *ac, t_atom **av)
+{
+	XnFieldOfView xFieldOfView;
+
+	if ((*ac)&&(*av))
+	{
+		//memory passed in, use it
+	}
+	else
+	{
+		//otherwise allocate memory
+		*ac = 2;
+		if (!(*av = (t_atom *)jit_getbytes(sizeof(t_atom)*(*ac))))
+		{
+			*ac = 0;
+			return JIT_ERR_OUT_OF_MEM;
+		}
+	}
+
+	xnGetDepthFieldOfView(x->hProductionNode[DEPTH_GEN_INDEX], &xFieldOfView);
+	jit_atom_setfloat(*av, xFieldOfView.fHFOV);
+	jit_atom_setfloat((*av) + 1, xFieldOfView.fVFOV);
+	return JIT_ERR_NONE;
 }

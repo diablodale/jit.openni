@@ -36,6 +36,16 @@ Build notes-----------
 - You will need to change the build's include and library directories to match
   the locations in the Max SDK and OpenNI SDK.
 
+v0.7.2---------
+- Added floor location "/floor" from any configured scene analyzer. This is output from the "OSC" outlet in the configured skeleton_value_type.
+  Values are a list of 6 floats: first 3 are the X, Y, Z coordinates for a point on the place, the second 3 are the X, Y, Z of a normal vector
+- Through casual observation, PrimeSense's NITE scene generator at first generates all zeros, but later generates reasonably
+  good values. The floor point's X value is always 0.0. Z appears to stablize at 349.18811 and the remaining values change based on your physical setup.
+- I do support skeleton_value_type and its conversions of these floor values. Warning, anything but skeleton_value_type=0 can generates point x, y, z values
+  which are offscreen or beyond the [0...1] normalization. This is by design.
+- Added new attribute depth_fov which contains the field of view (horizontal and vertical, in that order) of the depth generator in radians. Remember that
+  this attribute can be queried using standard Max messages like "getdepth_fov" and its results will be output via dumpout outlet
+
 v0.7.1---------
 - performance improvement: no new OpenNI data -> don't get and transform old data
 - minor refactoring and perf changes in main matrix calc loop

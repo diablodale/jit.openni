@@ -45,16 +45,17 @@
 // Macros
 //---------------------------------------------------------------------------
 
-#define JIT_OPENNI_VERSION "v0.7.1"
+#define JIT_OPENNI_VERSION "v0.7.2"
 #define MAX_NUM_USERS_SUPPORTED 15		// I have not found an OpenNI API to determine the max number possible for user generators
 #define NUM_OF_SKELETON_JOINT_TYPES 24	// I have not found an OpenNI API to determine the number of joints types (head, left foot, etc.) for a user generator
-#define NUM_OPENNI_GENERATORS 4
+#define NUM_OPENNI_GENERATORS 5
 #define DEPTH_GEN_INDEX 0
 #define IMAGE_GEN_INDEX 1
 #define IR_GEN_INDEX 2
 #define USER_GEN_INDEX 3
+#define SCENE_GEN_INDEX 4
 
-#define NUM_OPENNI_MAPS 4		// total number of matrices outputs derived from OpenNI maps
+#define NUM_OPENNI_MAPS 4		// total number of matrices outputs/outlets derived from OpenNI maps
 #define DEPTHMAP_OUTPUT_INDEX 0	// currently all map generators MUST be first in order
 #define IMAGEMAP_OUTPUT_INDEX 1
 #define IRMAP_OUTPUT_INDEX 2
@@ -67,7 +68,7 @@
 #define IMAGEMAP_ASSIST_TEXT "(matrix) imagemap generator"
 #define IRMAP_ASSIST_TEXT "(matrix) irmap generator"
 #define USERPIXELMAP_ASSIST_TEXT "(matrix) usermap generator"
-#define SKELETON_ASSIST_TEXT "(message) skeleton"
+#define SKELETON_ASSIST_TEXT "(message) skeletons, floor info"
 
 #define NUM_JITOPENNI_OUTPUTS (NUM_OPENNI_MAPS + NUM_OPENNI_MISC_OUTPUTS)	// this is the total number of outputs on the jit.open external not counting dumpout.
 
@@ -185,6 +186,7 @@ typedef struct _jit_openni {
 	char bOutputSkeletonOrientation, bOutputDepthmap, bOutputImagemap, bOutputIRmap, bOutputUserPixelsmap, bOutputSkeleton, siSkeletonValueType;
 	short iNumUsersSeen;
 	t_user_and_joints *pUserSkeletonJoints;
+	XnPlane3D planeFloor;
 	t_jit_linklist *pEventCallbackFunctions;
 } t_jit_openni;
 
@@ -215,6 +217,7 @@ void XN_CALLBACK_TYPE UserCalibration_CalibrationStart(XnNodeHandle hSkeletonCap
 void XN_CALLBACK_TYPE UserCalibration_CalibrationComplete(XnNodeHandle hSkeletonCapability, XnUserID userID, XnCalibrationStatus calibrationResult, t_jit_openni *x);
 void XN_CALLBACK_TYPE User_Exit					(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x);
 void XN_CALLBACK_TYPE User_ReEnter				(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x);
+t_jit_err jit_openni_depthfov_get				(t_jit_openni *x, void *attr, long *ac, t_atom **av);
 
 
 // max.jit.openni.c

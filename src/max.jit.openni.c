@@ -319,6 +319,7 @@ void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 	const char strSkelFormatOutput[3][12] = { "/skel/%u/%s", "skel", "/joint" };		// switchable skeleton output format selectors
 	// the [2] format string below should be an unsigned %u, however OSCeleton codebase incorrectly uses %d so I also use it here for compatibility
 	const char strUserCoMFormatOutput[3][9] = { "/user/%u", "user", "/user/%d" };		// switchable user CoM output format selectors
+	const char strFloorFormatOutput[3][7] = { "/floor", "floor", "/floor" };			// switchable floor output format selectors
 		
 	LOG_DEBUG("starting custom outputmatrix()");
 	if (outputmode && mop)
@@ -342,6 +343,20 @@ void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 			}
 		}
 
+		// output floor from scene generator
+		if (pJit_OpenNI->hProductionNode[SCENE_GEN_INDEX])
+		{
+			msg_selector_string = (char *)strFloorFormatOutput[x->chrSkeletonOutputFormat];
+			atom_setfloat(&(osc_argv[0]), pJit_OpenNI->planeFloor.ptPoint.X);
+			atom_setfloat(&(osc_argv[1]), pJit_OpenNI->planeFloor.ptPoint.Y);
+			atom_setfloat(&(osc_argv[2]), pJit_OpenNI->planeFloor.ptPoint.Z);
+			atom_setfloat(&(osc_argv[3]), pJit_OpenNI->planeFloor.vNormal.X);
+			atom_setfloat(&(osc_argv[4]), pJit_OpenNI->planeFloor.vNormal.Y);
+			atom_setfloat(&(osc_argv[5]), pJit_OpenNI->planeFloor.vNormal.Z);
+			outlet_anything(x->osc_outlet, gensym(msg_selector_string), 6, osc_argv);
+		}
+
+		// output seen users' centers of mass and skeletons
 		for (i=0; i<pJit_OpenNI->iNumUsersSeen; i++)
 		{
 			short iNumAtoms = 0;
@@ -403,8 +418,12 @@ void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 
 						if (pJit_OpenNI->bOutputSkeletonOrientation && (x->chrSkeletonOutputFormat != 2))
 						{
-							// TODO need to verify I've extracted the correct direction vector for each joint's local axes
-							//for (k=0; k<9; k++) atom_setfloat(osc_argv + iAtomOffset + 4 + k, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.orientation.elements[k]);
+							// General belief and https://groups.google.com/forum/#!topic/openni-dev/-ib1yX-o0lk say that OpenNI stores the
+							// orientation matrix in row-major order.
+							// X axis = (elements[0], elements[3], elements[6])
+							// Y axis = (elements[1], elements[4], elements[7])
+							// Z axis = (elements[2], elements[5], elements[8])
+							// Just in case, column major order is easy to substitute with: for (k=0; k<9; k++) atom_setfloat(osc_argv + iAtomOffset + 4 + k, pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.orientation.elements[k]);
 							for (k=0; k<3; k++)
 							{
 								atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].jointTransform[j].orientation.orientation.elements[k]);
