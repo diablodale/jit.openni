@@ -38,6 +38,7 @@
 
 
 // globals
+XnVersion currentOpenNIVersion;
 static void	*max_jit_openni_class = NULL;
 static char *strJointNames[] = { NULL,
 	"head", "neck", "torso", "waist",
@@ -60,9 +61,16 @@ int main(void)
 {	
 	void *p, *q;
 	t_jit_object	*attr;
-	
-	post("jit.openni %s, Copyright (c) 2011 Dale Phurrough. This program comes with ABSOLUTELY NO WARRANTY.", JIT_OPENNI_VERSION);
+
+	post("jit.openni %s, Copyright (c) 2012 Dale Phurrough. This program comes with ABSOLUTELY NO WARRANTY.", JIT_OPENNI_VERSION);
 	post("jit.openni %s, Licensed under the GNU General Public License v3.0 (GPLv3) available at http://www.gnu.org/licenses/gpl-3.0.html", JIT_OPENNI_VERSION);
+	post("jit.openni %s, Compiled against OpenNI %s", JIT_OPENNI_VERSION, XN_VERSION_STRING);
+	xnGetVersion(&currentOpenNIVersion);
+	#ifdef _DEBUG
+		post("Need OpenNI (%ld) currently have OpenNI (%ld)", OPENNI_REQUIRED_VERSION, (currentOpenNIVersion.nMajor*100000000 + currentOpenNIVersion.nMinor*1000000 + currentOpenNIVersion.nMaintenance*10000 + currentOpenNIVersion.nBuild) );
+	#endif
+	if ( (currentOpenNIVersion.nMajor*100000000 + currentOpenNIVersion.nMinor*1000000 + currentOpenNIVersion.nMaintenance*10000 + currentOpenNIVersion.nBuild) < OPENNI_REQUIRED_VERSION)
+		error("jit.openni %s, Requires at least OpenNI %s. Please read the installation documentation.", JIT_OPENNI_VERSION, XN_BRIEF_VERSION_STRING);
 
 	// initialize the Jitter class by calling Jitter class's registration function
 	jit_openni_init();
@@ -91,6 +99,7 @@ int main(void)
     // add methods to the Max wrapper class
 	max_addmethod_usurp_low((method)max_jit_openni_outputmatrix, "outputmatrix");	
 	max_addmethod_usurp_low((method)max_jit_openni_XMLConfig_read, "read");
+	max_addmethod_usurp_low((method)max_jit_openni_get_versions, "getversions");
 
 	// add an inlet/outlet assistance method; in this case the default matrix-operator (mop) assist fn 
 	addmess((method)max_jit_openni_assist, "assist", A_CANT, 0);
@@ -219,6 +228,22 @@ void max_jit_openni_assist(t_max_jit_openni *x, void *b, long io, long index, ch
 	}
 }
 
+void max_jit_openni_get_versions(t_max_jit_openni *x, t_symbol *s, short argc, t_atom *argv)
+{
+	XnVersion theVersion;
+	t_atom OutAtoms[4];
+
+	atom_setlong(OutAtoms, JIT_OPENNI_VERSION_MAJOR);
+	atom_setlong(OutAtoms + 1, JIT_OPENNI_VERSION_MINOR);
+	atom_setlong(OutAtoms + 2, JIT_OPENNI_VERSION_INCRM);
+	max_jit_obex_dumpout(x, gensym("version_jit.openni"), 3, OutAtoms);
+
+	atom_setlong(OutAtoms, currentOpenNIVersion.nMajor);
+	atom_setlong(OutAtoms + 1, currentOpenNIVersion.nMinor);
+	atom_setlong(OutAtoms + 2, currentOpenNIVersion.nMaintenance);
+	atom_setlong(OutAtoms + 3, currentOpenNIVersion.nBuild);
+	max_jit_obex_dumpout(x, gensym("version_openni"), 4, OutAtoms);
+}
 
 void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc, t_atom *argv)
 {

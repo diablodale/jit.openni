@@ -47,7 +47,10 @@
 		</Node>
 
     <Node type="User" name="User1"/>
-    <Node type="Scene" name="Scene1"/>
+    
+    <!-- removing scene generator because one is already being created without our request and declaring
+    one here will cause a failure conflict -->
+    <!-- <Node type="Scene" name="Scene1"/> -->
     
     <!--
     <Node type="Gesture" name="Gesture1"/>

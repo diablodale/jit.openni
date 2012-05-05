@@ -45,9 +45,17 @@
 // Macros
 //---------------------------------------------------------------------------
 
-#define JIT_OPENNI_VERSION "v0.7.3"
-#define MAX_NUM_USERS_SUPPORTED 15		// I have not found an OpenNI API to determine the max number possible for user generators
-#define NUM_OF_SKELETON_JOINT_TYPES 24	// I have not found an OpenNI API to determine the number of joints types (head, left foot, etc.) for a user generator
+#define JIT_OPENNI_VERSION_MAJOR 0
+#define JIT_OPENNI_VERSION_MINOR 7
+#define JIT_OPENNI_VERSION_INCRM 4
+#define JIT_OPENNI_VERSION "v" \
+	XN_STRINGIFY(JIT_OPENNI_VERSION_MAJOR) "." \
+	XN_STRINGIFY(JIT_OPENNI_VERSION_MINOR) "." \
+	XN_STRINGIFY(JIT_OPENNI_VERSION_INCRM)
+//#define OPENNI_REQUIRED_VERSION 103020003	// This is the XN_VERSION (or greater) required for this codebase
+#define OPENNI_REQUIRED_VERSION XN_VERSION	// This is the XN_VERSION (or greater) required for this codebase
+#define MAX_NUM_USERS_SUPPORTED 15		// TODO I have not found an OpenNI API to determine the max number possible for user generators
+#define NUM_OF_SKELETON_JOINT_TYPES 24	// TODO I have not found an OpenNI API to determine the number of joints types (head, left foot, etc.) for a user generator
 #define NUM_OPENNI_GENERATORS 5
 #define DEPTH_GEN_INDEX 0
 #define IMAGE_GEN_INDEX 1
@@ -184,6 +192,7 @@ typedef struct _jit_openni {
 	XnChar strRequiredCalibrationPose[XN_MAX_NAME_LENGTH];
 	float fPositionConfidenceFilter, fOrientConfidenceFilter, fSkeletonSmoothingFactor;
 	char bOutputSkeletonOrientation, bOutputDepthmap, bOutputImagemap, bOutputIRmap, bOutputUserPixelsmap, bOutputSkeleton, siSkeletonValueType, bOutputSceneFloor;
+	char siSkeletonProfile;
 	short iNumUsersSeen;
 	t_user_and_joints *pUserSkeletonJoints;
 	XnPlane3D planeFloor;
@@ -227,6 +236,7 @@ void			max_jit_openni_free				(t_max_jit_openni *x);
 void			max_jit_openni_XMLConfig_read	(t_max_jit_openni *x, t_symbol *s, short argc, t_atom *argv);
 void			max_jit_openni_outputmatrix		(t_max_jit_openni *x);
 void			max_jit_openni_post_events		(t_jit_openni *x, enum JitOpenNIEvents iEventType, XnUserID userID);
+void			max_jit_openni_get_versions		(t_max_jit_openni *x, t_symbol *s, short argc, t_atom *argv);
 
 
 #endif

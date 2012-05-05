@@ -181,6 +181,14 @@ t_jit_err jit_openni_init(void)
 			(method)jit_openni_scenefloor_get, NULL, NULL);
 	jit_class_addattr(s_jit_openni_class, attr);
 
+	// TODO expose skeleton profile selection attribute
+	//attr = jit_object_new(_jit_sym_jit_attr_offset, "skeleton_profile", _jit_sym_char, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW,
+	//		NULL, NULL, calcoffset(t_jit_openni, siSkeletonProfile));
+	//jit_attr_addfilterset_clip(attr,1,5,TRUE,TRUE);
+	//jit_class_addattr(s_jit_openni_class, attr);
+
+
+
 	// finalize class
 	jit_class_register(s_jit_openni_class);
 	return JIT_ERR_NONE;
@@ -211,6 +219,7 @@ t_jit_openni *jit_openni_new(void *pParent)
 		x->bOutputSceneFloor = 0;
 		x->fSkeletonSmoothingFactor = 0.0;	//BUGBUG what is the OpenNI/NITE default?
 		x->siSkeletonValueType = 0;
+		x->siSkeletonProfile = XN_SKEL_PROFILE_ALL;	//  XN_SKEL_PROFILE_ALL = 2
 		x->pEventCallbackFunctions = (t_jit_linklist *)jit_object_new(_jit_sym_jit_linklist);
 
 		LOG_DEBUG("Creating a new OpenNI context");
@@ -440,6 +449,8 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 								}
 								if (x->bHaveSkeletonSupport && x->pUserSkeletonJoints[j].bUserSkeletonTracked)
 								{
+									// BUGBUG need to use a, to be created, list of active joints rather than assuming all 24 now that I support skeletonprofiles
+
 									// fill in joint struct
 									for (iJoint = 1; iJoint <= NUM_OF_SKELETON_JOINT_TYPES; iJoint++)
 									{
@@ -460,7 +471,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 									}
 								}
 							}
-							x->iNumUsersSeen = tmpNumUsers;	// this and the code directly above are not multithread safe due to changing pUserSkeletonJoints structure without a mutex
+							x->iNumUsersSeen = tmpNumUsers;	// BUGBUG this and the code directly above are not multithread safe due to changing pUserSkeletonJoints structure without a mutex
 						}
 						if (!x->bOutputUserPixelsmap) continue;
 						xnGetUserPixels(x->hProductionNode[USER_GEN_INDEX], 0, (XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX]);
@@ -737,7 +748,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 			// check for and then setup skeleton support
 			if (xnIsCapabilitySupported(x->hProductionNode[USER_GEN_INDEX], XN_CAPABILITY_SKELETON))
 			{
-				if (xnIsProfileAvailable(x->hProductionNode[USER_GEN_INDEX], XN_SKEL_PROFILE_ALL))
+				if (xnIsProfileAvailable(x->hProductionNode[USER_GEN_INDEX], (XnSkeletonProfile)x->siSkeletonProfile))
 				{
 					if (xnNeedPoseForSkeletonCalibration(x->hProductionNode[USER_GEN_INDEX]))
 					{
@@ -760,7 +771,9 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 					}
 					if (x->bHaveSkeletonSupport)
 					{
-						xnSetSkeletonProfile(x->hProductionNode[USER_GEN_INDEX], XN_SKEL_PROFILE_ALL);
+						xnSetSkeletonProfile(x->hProductionNode[USER_GEN_INDEX], (XnSkeletonProfile)x->siSkeletonProfile);
+						// TODO xnEnumerateActiveJoints() and store so later in matrix_calc will only retrieve those joints. Need to them pass the
+						// active joint list back to the max wrapper so it only iterates over them.
 						xnRegisterToCalibrationStart(x->hProductionNode[USER_GEN_INDEX], UserCalibration_CalibrationStart, x, &(x->hCalibrationStartCallback));
 						xnRegisterToCalibrationComplete(x->hProductionNode[USER_GEN_INDEX], UserCalibration_CalibrationComplete, x, &(x->hCalibrationCompleteCallback));
 						x->pUserSkeletonJoints = (t_user_and_joints *)sysmem_newptr(sizeof(t_user_and_joints) * MAX_NUM_USERS_SUPPORTED);
@@ -769,7 +782,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 				}
 				else
 				{
-					LOG_ERROR("User generator skeleton capability must support the all joints profile XN_SKEL_PROFILE_ALL");
+					LOG_ERROR("User generator skeleton capability does not support the skeleton profile requested");
 				}
 			}
 			else
@@ -1078,6 +1091,10 @@ t_jit_err jit_openni_scenefloor_get(t_jit_openni *x, void *attr, long *ac, t_ato
 		jit_atom_setfloat((*av) + 3, planeFloor.vNormal.X);
 		jit_atom_setfloat((*av) + 4, planeFloor.vNormal.Y);
 		jit_atom_setfloat((*av) + 5, planeFloor.vNormal.Z);
+		return JIT_ERR_NONE;
 	}
-	return JIT_ERR_NONE;
+	else
+	{
+		return JIT_ERR_DATA_UNAVAILABLE;
+	}
 }
