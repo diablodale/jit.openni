@@ -1,7 +1,9 @@
+# Visual Studio
 *proj.user
 *.ncb
 *.aps
 *.suo
+*.sln.docstates
 *.cache
 *.pdb
 *.obj
@@ -12,3 +14,62 @@ intermed/
 *.exp
 *.ilk
 *.lib
+*.slo
+*.lo
+*.o
+*.lai
+*.la
+*.a
+*.so
+*.dylib
+*.pyc
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# OSX
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+*.swp
+*.lock
+profile
+# Thumbnails
+._*
+# Files that might appear on external disk
+.Spotlight-V100
+.Trashes
+
+# Xcode
+dsa_priv.pem
+build/
+*.pbxuser
+!default.pbxuser
+*.mode1
+*.mode1v3
+*.mode2v3
+*.perspective
+*.perspectivev3
+!default.mode1v3
+!default.mode2v3
+!default.perspectivev3
+!default.xcworkspace
+*.xcworkspace
+xcuserdata
+project.xcworkspace/
+!xcshareddata
+*.moved-aside
+DerivedData/
+.idea/
+# automatic backup files
+*~.nib
+*.swp
+*~
+*(Autosaved).rtfd/
+Backup[ ]of[ ]*.pages/
+Backup[ ]of[ ]*.key/
+Backup[ ]of[ ]*.numbers/
