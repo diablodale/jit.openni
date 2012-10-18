@@ -181,6 +181,11 @@ t_jit_err jit_openni_init(void)
 			(method)jit_openni_scenefloor_get, NULL, NULL);
 	jit_class_addattr(s_jit_openni_class, attr);
 
+	attr = jit_object_new(_jit_sym_jit_attr_offset, "distmeter", _jit_sym_char, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW,
+			NULL, NULL, calcoffset(t_jit_openni, cbDistInMeters));
+	jit_attr_addfilterset_clip(attr,0,1,TRUE,TRUE);
+	jit_class_addattr(s_jit_openni_class, attr);
+
 	// TODO expose skeleton profile selection attribute
 	//attr = jit_object_new(_jit_sym_jit_attr_offset, "skeleton_profile", _jit_sym_char, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW,
 	//		NULL, NULL, calcoffset(t_jit_openni, siSkeletonProfile));
@@ -219,6 +224,7 @@ t_jit_openni *jit_openni_new(void *pParent)
 		x->bOutputSceneFloor = 0;
 		x->fSkeletonSmoothingFactor = 0.0;	//BUGBUG what is the OpenNI/NITE default?
 		x->siSkeletonValueType = 0;
+		x->cbDistInMeters = 0;
 		x->siSkeletonProfile = XN_SKEL_PROFILE_ALL;	//  XN_SKEL_PROFILE_ALL = 2
 		x->pEventCallbackFunctions = (t_jit_linklist *)jit_object_new(_jit_sym_jit_linklist);
 
@@ -229,10 +235,10 @@ t_jit_openni *jit_openni_new(void *pParent)
 		}
 		else
 		{
-			x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX] = (XnMapMetaData *)xnAllocateDepthMetaData();
-			x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX] = (XnMapMetaData *)xnAllocateImageMetaData();
-			x->pMapMetaData[IRMAP_OUTPUT_INDEX] = (XnMapMetaData *)xnAllocateIRMetaData();
-			x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX] = (XnMapMetaData *)xnAllocateSceneMetaData();
+			x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX] = (XnDepthMetaData *)xnAllocateDepthMetaData();
+			x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX] = (XnDepthMetaData *)xnAllocateImageMetaData();
+			x->pMapMetaData[IRMAP_OUTPUT_INDEX] = (XnDepthMetaData *)xnAllocateIRMetaData();
+			x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX] = (XnDepthMetaData *)xnAllocateSceneMetaData();
 		}
 		LOG_DEBUG("object created");
 	}
@@ -330,14 +336,15 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 	long out_savelock[NUM_OPENNI_MAPS];
 	t_jit_matrix_info out_minfo;
 	char *out_bp;	// char* so can reference down to a single byte as needed
-	int i, j, dimcount;
+	int i, j;
 	void *out_matrix[NUM_OPENNI_MAPS];
 	boolean bGotOutMatrices = true;
 	XnStatus nRetVal = XN_STATUS_OK;
 	XnUInt16 tmpNumUsers = MAX_NUM_USERS_SUPPORTED;
+	t_jit_openni_ndim ndim_holder;
 #ifdef _DEBUG
-	long long unsigned lluTimestamp = 0;
-	long unsigned luFrameID;
+	boolean bFrameIDsInSync = true;
+	long unsigned luFrameID = 0;
 #endif
 
 	if (!x->bHaveValidGeneratorProductionNode) return JIT_ERR_HW_UNAVAILABLE;
@@ -371,7 +378,8 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 		}
 		else
 		{
-			LOG_DEBUG("updated generators and metadata, wait for none");
+			//LOG_DEBUG("updated generators and metadata, wait for none");
+			ndim_holder.cbDistInMeters = x->cbDistInMeters;
 			for (i = 0; i< NUM_OPENNI_GENERATORS; i++)
 			{
 				if (x->hProductionNode[i])
@@ -379,34 +387,46 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 					// fill out matrix info structs for input and output
 					if (i < NUM_OPENNI_MAPS) jit_object_method(out_matrix[i],_jit_sym_getinfo,&out_minfo);
 
-					LOG_DEBUG3("generator[%d] type=%s", i, xnProductionNodeTypeToString(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type));
-					LOG_DEBUG3("generator[%d] is derived from map=%s", i, xnIsTypeDerivedFrom(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type, XN_NODE_TYPE_MAP_GENERATOR) ? "true":"false");
+					//LOG_DEBUG("generator[%d] type=%s", i, xnProductionNodeTypeToString(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type));
+					//LOG_DEBUG("generator[%d] is derived from map=%s", i, xnIsTypeDerivedFrom(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type, XN_NODE_TYPE_MAP_GENERATOR) ? "true":"false");
 					if (!xnIsDataNew(x->hProductionNode[i])) continue;
 					switch(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type)
 					{
 					case XN_NODE_TYPE_DEPTH:
 						if (!x->bOutputDepthmap) continue;
-						xnGetDepthMetaData(x->hProductionNode[i], (XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX]);
+						xnGetDepthMetaData(x->hProductionNode[i], x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX]);
 						if (err = changeMatrixOutputGivenMapMetaData(x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX], &out_minfo)) goto out;
+						ndim_holder.cbIsDepthData = true;
 						break;
 					case XN_NODE_TYPE_IMAGE:
 						if (!x->bOutputImagemap) continue;
 						xnGetImageMetaData(x->hProductionNode[i], (XnImageMetaData *)x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX]);
 						if (err = changeMatrixOutputGivenMapMetaData(x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX], &out_minfo)) goto out;
+						ndim_holder.cbIsDepthData = false;
 						break;
 					case XN_NODE_TYPE_IR:
 						if (!x->bOutputIRmap) continue;
 						xnGetIRMetaData(x->hProductionNode[i], (XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX]);
 						if (err = changeMatrixOutputGivenMapMetaData(x->pMapMetaData[IRMAP_OUTPUT_INDEX], &out_minfo)) goto out;
+						ndim_holder.cbIsDepthData = false;
 						break;
 					case XN_NODE_TYPE_SCENE:
 						// no need to xnGetSceneMetaData()
 						if (!x->bOutputSceneFloor) continue;
 						xnGetFloor(x->hProductionNode[i], &(x->planeFloor));
-						switch (x->siSkeletonValueType) // case 0 is the default native OpenNI values (real world)
+						switch (x->siSkeletonValueType)
 						{
+						case 0:		// default native OpenNI values (real world)
+							if (x->cbDistInMeters)
+							{
+								x->planeFloor.ptPoint.X *= .001;
+								x->planeFloor.ptPoint.Y *= .001;
+								x->planeFloor.ptPoint.Z *= .001;
+							}
+							break;
 						case 1:		// the OpenNI projective coordinates
 							xnConvertRealWorldToProjective(x->hProductionNode[DEPTH_GEN_INDEX], 1, &(x->planeFloor.ptPoint), &(x->planeFloor.ptPoint));
+							if (x->cbDistInMeters) x->planeFloor.ptPoint.Z *= .001;
 							break;
 						case 2:		// legacy "normalized" OSCeleton values
 							// I do not support the legacy OSCeleton multiplier and offset, if a dev is that advanced, they can do the simple conversion to this object's native output
@@ -425,19 +445,28 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 						if (x->bOutputSkeleton)
 						{
 							xnGetUsers(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs, &tmpNumUsers);
-							LOG_DEBUG2("Current num of users=%d", tmpNumUsers);
+							//LOG_DEBUG2("Current num of users=%d", tmpNumUsers);
 							for (j=0; j<tmpNumUsers; j++)
 							{
 								int iJoint;
 
-								LOG_DEBUG3("user[%d]=%d", j, x->aUserIDs[j]);
+								//LOG_DEBUG("user[%d]=%d", j, x->aUserIDs[j]);
 								x->pUserSkeletonJoints[j].userID = x->aUserIDs[j];
 								x->pUserSkeletonJoints[j].bUserSkeletonTracked = xnIsSkeletonTracking(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs[j]);
 								xnGetUserCoM(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs[j], &(x->pUserSkeletonJoints[j].userCoM));
-								switch (x->siSkeletonValueType)  // case 0 is the default native OpenNI values (real world)
+								switch (x->siSkeletonValueType)
 								{
+								case 0:		// default native OpenNI values (real world)
+									if (x->cbDistInMeters)
+									{
+										x->pUserSkeletonJoints[j].userCoM.X *= .001;
+										x->pUserSkeletonJoints[j].userCoM.Y *= .001;
+										x->pUserSkeletonJoints[j].userCoM.Z *= .001;
+									}
+									break;
 								case 1:		// the OpenNI projective coordinates
 									xnConvertRealWorldToProjective(x->hProductionNode[DEPTH_GEN_INDEX], 1, &(x->pUserSkeletonJoints[j].userCoM), &(x->pUserSkeletonJoints[j].userCoM));
+									if (x->cbDistInMeters) x->pUserSkeletonJoints[j].userCoM.Z *= .001;
 									break;
 								case 2:		// legacy "normalized" OSCeleton values
 									// I do not support the legacy OSCeleton multiplier and offset, if a dev is that advanced, they can do the simple conversion to this object's native output
@@ -455,10 +484,19 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 									for (iJoint = 1; iJoint <= NUM_OF_SKELETON_JOINT_TYPES; iJoint++)
 									{
 										xnGetSkeletonJoint(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs[j], (XnSkeletonJoint)iJoint, &(x->pUserSkeletonJoints[j].jointTransform[iJoint]));
-										switch (x->siSkeletonValueType) // case 0 is the default native OpenNI values (real world)
+										switch (x->siSkeletonValueType)
 										{
+										case 0:		 // default native OpenNI values (real world)
+											if (x->cbDistInMeters)
+											{
+												x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position.X *= .001;
+												x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position.Y *= .001;
+												x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position.Z *= .001;
+											}
+											break;
 										case 1:		// the OpenNI projective coordinates
 											xnConvertRealWorldToProjective(x->hProductionNode[DEPTH_GEN_INDEX], 1, &(x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position), &(x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position));
+											if (x->cbDistInMeters) x->pUserSkeletonJoints[j].jointTransform[iJoint].position.position.Z *= .001;
 											break;
 										case 2:		// legacy "normalized" OSCeleton values
 											// I do not support the legacy OSCeleton multiplier and offset, if a dev is that advanced, they can do the simple conversion to this object's native output
@@ -476,46 +514,42 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 						if (!x->bOutputUserPixelsmap) continue;
 						xnGetUserPixels(x->hProductionNode[USER_GEN_INDEX], 0, (XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX]);
 						if (err = changeMatrixOutputGivenMapMetaData(x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX], &out_minfo)) goto out;
-						LOG_DEBUG3("**USERPXL**FrameID=%lu Timestamp=%llu", ((XnSceneMetaData *)x->pMapMetaData[i])->pMap->pOutput->nFrameID, ((XnSceneMetaData *)x->pMapMetaData[i])->pMap->pOutput->nTimestamp);
+						ndim_holder.cbIsDepthData = false;
 					}
-//					if (xnIsTypeDerivedFrom(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type, XN_NODE_TYPE_MAP_GENERATOR))
-					LOG_DEBUG("updated metadata for incoming map generator frame");
-					LOG_DEBUG3("generator[%d] pixelformat=%s", i, xnPixelFormatToString(((XnDepthMetaData *)x->pMapMetaData[i])->pMap->PixelFormat));
-					LOG_DEBUG3("FrameID=%lu Timestamp=%llu", ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->nFrameID, ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->nTimestamp);
+					// if we get here, we should be a map generator given above code loop/continue, previously used forced API like...
+					//	if (xnIsTypeDerivedFrom(xnNodeInfoGetDescription(xnGetNodeInfo(x->hProductionNode[i]))->Type, XN_NODE_TYPE_MAP_GENERATOR))
 #ifdef _DEBUG
-					if (!lluTimestamp)
+					LOG_DEBUG("generator[%d] FrameID=%lu Timestamp=%llu pixelformat=%s", i, ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->nFrameID,
+							((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->nTimestamp,
+							xnPixelFormatToString(((XnDepthMetaData *)x->pMapMetaData[i])->pMap->PixelFormat));
+					if (!luFrameID)		// this might fail on first frame
 					{
-						lluTimestamp = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->nTimestamp;
+						//lluTimestamp = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->nTimestamp;
 						luFrameID = ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->nFrameID;
 					}
 					else
 					{
-						if (lluTimestamp != ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->nTimestamp) LOG_ERROR("Timestamps are not the same for all generators within a single update");
-						if (luFrameID != ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->nFrameID) LOG_ERROR("FrameIDs are not the same for all generators within a single update");
+						//if (lluTimestamp != ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->nTimestamp) LOG_DEBUG("Timestamps are not the same for all generators within a single update");
+						if (luFrameID != ((XnDepthMetaData *)x->pMapMetaData[i])->pMap->pOutput->nFrameID) bFrameIDsInSync = false;
 					}
 #endif
 					jit_object_method(out_matrix[i], _jit_sym_setinfo, &out_minfo);	// after testing with max_jit_mop_notify(), setting info that is the same as the existing matrix does not trigger the modify or rebuild matrix functions
 					jit_object_method(out_matrix[i], _jit_sym_getinfo, &out_minfo);	// BUGBUG for some reason, I have to call this or Max crashes when you change matrix attributes via inspector
-#ifdef _DEBUG
-					// get dimensions/planecount
-					dimcount = out_minfo.dimcount;
-					for (j=0;j<dimcount;j++)
-					{
-						object_post((t_object*)x, "out%d dim[%d] = %d", i, j, out_minfo.dim[j]);
-						object_post((t_object*)x, "out%d dimstride[%d] = %d", i, j, out_minfo.dimstride[j]);
-					}
-					LOG_DEBUG3("out%d planes = %d", i, out_minfo.planecount);
-					LOG_DEBUG3("out%d type = %s", i, out_minfo.type->s_name);
-#endif
+
 					// get matrix data pointers
 					jit_object_method(out_matrix[i],_jit_sym_getdata,&out_bp);
 					if (!out_bp) { err=JIT_ERR_INVALID_OUTPUT; goto out;} // if data pointers are invalid, set error, and cleanup
 
 					// manually copy OpenNI arrays to jitter matrix because jitter doesn't directly support them
 					// by using the Jitter parallel functions
-					jit_parallel_ndim_simplecalc1((method)jit_openni_calculate_ndim, x->pMapMetaData[i], out_minfo.dimcount, out_minfo.dim, out_minfo.planecount, &out_minfo, out_bp, 0);
+					ndim_holder.pData = (XnDepthPixel *)x->pMapMetaData[i]->pData;
+					ndim_holder.pMap = x->pMapMetaData[i]->pMap;
+					jit_parallel_ndim_simplecalc1((method)jit_openni_calculate_ndim, &ndim_holder, out_minfo.dimcount, out_minfo.dim, out_minfo.planecount, &out_minfo, out_bp, 0);
 				}
 			}
+#ifdef _DEBUG
+			if (!bFrameIDsInSync) LOG_DEBUG("FrameIDs are not the same for all generators within a single update");
+#endif
 		}
 out:
 		if (err) x->iNumUsersSeen = 0;		// invalidate skeletons if encountered an error
@@ -566,15 +600,16 @@ t_jit_err changeMatrixOutputGivenMapMetaData(void *pMetaData, t_jit_matrix_info 
 	return JIT_ERR_NONE;
 }
 
-void copy16BitDatatoJitterMatrix(XnDepthMetaData *pMapMetaData, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, long rowOffset)
+void copy16BitDatatoJitterMatrix(t_jit_openni_ndim *ndim_holder, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, long rowOffset)
 {
-	// this function assumes all parameters are valid, and requires that all map metadata's passed via pMapMetaData have the same byte location for the data itself
+	// mostly likely, this data is a depthmap or IRmap
+	// this function assumes all parameters are valid, and requires that all map metadata's passed via ndim_holder have the same byte location for the data itself
 	
 	int i, j;
-	XnUInt16 *p16BitData; // aka XnDepthPixel or 16bit greysacale xnImagePixel
+	XnUInt16 *p16BitData; // aka XnDepthPixel or 16bit greyscale xnImagePixel
 
 	// this ->pData assumes XnDepthMetaData struct, and pointer arithmetic automatically jumps by 2 bytes
-	p16BitData = (XnUInt16 *)pMapMetaData->pData + (rowOffset * pMapMetaData->pMap->FullRes.X);
+	p16BitData = (XnUInt16 *)ndim_holder->pData + (rowOffset * ndim_holder->pMap->FullRes.X);
 	
 	for(i=0; i < dim[1]; i++)  // for each row
 	{
@@ -582,15 +617,15 @@ void copy16BitDatatoJitterMatrix(XnDepthMetaData *pMapMetaData, long dimcount, l
 		{
 			if (minfo1->type == _jit_sym_long)
 			{
-				((unsigned long *)bp1)[j] = *p16BitData;
+				((long *)bp1)[j] = (ndim_holder->cbIsDepthData && ndim_holder->cbDistInMeters ? (long)((float)*p16BitData * .001f) : *p16BitData);	//doesn't round intentionally
 			}
 			else if (minfo1->type == _jit_sym_float32)
 			{
-				((float *)bp1)[j] = *p16BitData;
+				((float *)bp1)[j] = (ndim_holder->cbIsDepthData && ndim_holder->cbDistInMeters ? (float)*p16BitData * .001f : *p16BitData);
 			}
 			else // it is _jit_sym_float64
 			{
-				((double *)bp1)[j] = *p16BitData;
+				((double *)bp1)[j] = (ndim_holder->cbIsDepthData && ndim_holder->cbDistInMeters ? (double)*p16BitData * .001f : *p16BitData);
 			}
 			p16BitData++;
 		}
@@ -598,25 +633,26 @@ void copy16BitDatatoJitterMatrix(XnDepthMetaData *pMapMetaData, long dimcount, l
 	}
 }
 
-void jit_openni_calculate_ndim(XnDepthMetaData *pMapMetaData, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, t_jit_parallel_ndim_worker *para_worker)
+void jit_openni_calculate_ndim(t_jit_openni_ndim *ndim_holder, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, t_jit_parallel_ndim_worker *para_worker)
 {
-	// this function assumes all parameters are valid, and requires that all map metadata's passed via pMapMetaData have the same byte location of the 	
+	// this function assumes all parameters are valid, and requires that all map metadata's passed via ndim_holder have the same byte location of the
 	// uses the t_jit_parallel_ndim_worker undocumented functionality as posted in the formums at http://cycling74.com/forums/topic.php?id=24525
+	// TODO and BUGBUG need to scale depth values by meter / mm attribute siSkeletonValueType
 	int i, j;
 	long rowOffset = para_worker->offset[1];
 
-	if (pMapMetaData->pMap->PixelFormat != XN_PIXEL_FORMAT_GRAYSCALE_16_BIT)
+	if (ndim_holder->pMap->PixelFormat != XN_PIXEL_FORMAT_GRAYSCALE_16_BIT)
 	{
 		XnUInt8 *pMapData;
 
 		// this ->pData assumes XnDepthMetaData struct, and pointer arithmetic jumps only 1 bytes so need to multiply by PixelFormat size
-		pMapData = (XnUInt8 *)pMapMetaData->pData + (rowOffset * (pMapMetaData->pMap->FullRes.X * xnGetBytesPerPixelForPixelFormat(pMapMetaData->pMap->PixelFormat)));
+		pMapData = (XnUInt8 *)ndim_holder->pData + (rowOffset * (ndim_holder->pMap->FullRes.X * xnGetBytesPerPixelForPixelFormat(ndim_holder->pMap->PixelFormat)));
 
 		for(i=0; i < dim[1]; i++) // for each row
 		{
 			for(j=0; j < dim[0]; j++)  // go across each column
 			{
-				switch(pMapMetaData->pMap->PixelFormat)
+				switch(ndim_holder->pMap->PixelFormat)
 				{
 					case XN_PIXEL_FORMAT_RGB24:
 						((unsigned long *)bp1)[j] = MAKEULONGFROMCHARS(0xFF, pMapData[0], pMapData[1], pMapData[2]); // not tested on big endian systems
@@ -626,11 +662,12 @@ void jit_openni_calculate_ndim(XnDepthMetaData *pMapMetaData, long dimcount, lon
 						((unsigned long *)bp1)[j] = MAKEULONGFROMCHARS(pMapData[0], pMapData[1], pMapData[2], pMapData[3]); // not tested on big endian systems
 						pMapData += 4;
 						break;
-					case XN_PIXEL_FORMAT_GRAYSCALE_8_BIT:	// if I give up sources that are not 4-bte aligned, I could use Jitter matrix copying functions
+					case XN_PIXEL_FORMAT_GRAYSCALE_8_BIT:
 															// TODO add support for long, float32, float64 output matrices
 						bp1[j] = *pMapData++;
 						break;
 					// case XN_PIXEL_FORMAT_GRAYSCALE_16_BIT is now handled below by calling a shared function copy16BitDatatoJitterMatrix()
+					// case XN_PIXEL_FORMAT_MJPEG is not handled
 				}
 			}
 			bp1 += minfo1->dimstride[1];
@@ -638,7 +675,7 @@ void jit_openni_calculate_ndim(XnDepthMetaData *pMapMetaData, long dimcount, lon
 	}
 	else
 	{
-		copy16BitDatatoJitterMatrix(pMapMetaData, dimcount, dim, planecount, minfo1, bp1, rowOffset);
+		copy16BitDatatoJitterMatrix(ndim_holder, dimcount, dim, planecount, minfo1, bp1, rowOffset);
 	}
 }
 
@@ -716,7 +753,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 					}
 					else
 					{
-						object_post((t_object*)x, "userpos[%u]= (%f, %f, %f) (%f, %f, %f)", i, box.LeftBottomNear.X, box.LeftBottomNear.Y, box.LeftBottomNear.Z, box.RightTopFar.X, box.RightTopFar.Y, box.RightTopFar.Z);
+						LOG_DEBUG("userpos[%u]= (%f, %f, %f) (%f, %f, %f)", i, box.LeftBottomNear.X, box.LeftBottomNear.Y, box.LeftBottomNear.Z, box.RightTopFar.X, box.RightTopFar.Y, box.RightTopFar.Z);
 					}
 				}
 			}
@@ -812,7 +849,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 			LOG_DEBUG2("== %lu Depth modes avail==", numDepthMapModes);
 			for (i=0; i<numDepthMapModes; i++)
 			{
-				object_post((t_object*)x, "FPS=%lu X=%lu Y=%lu Z=%u", depthMapModes[i].nFPS, depthMapModes[i].nXRes, depthMapModes[i].nYRes, xnGetDeviceMaxDepth(x->hProductionNode[DEPTH_GEN_INDEX]));
+				LOG_DEBUG("FPS=%lu X=%lu Y=%lu Z=%u", depthMapModes[i].nFPS, depthMapModes[i].nXRes, depthMapModes[i].nYRes, xnGetDeviceMaxDepth(x->hProductionNode[DEPTH_GEN_INDEX]));
 			}
 			sysmem_freeptr(depthMapModes);
 		}
@@ -829,7 +866,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 			LOG_DEBUG2("== %lu Image modes avail==", numImageMapModes);
 			for (i=0; i<numImageMapModes; i++)
 			{
-				object_post((t_object*)x, "FPS=%lu X=%lu Y=%lu", imageMapModes[i].nFPS, imageMapModes[i].nXRes, imageMapModes[i].nYRes);
+				LOG_DEBUG("FPS=%lu X=%lu Y=%lu", imageMapModes[i].nFPS, imageMapModes[i].nXRes, imageMapModes[i].nYRes);
 			}
 			sysmem_freeptr(imageMapModes);
 		}
@@ -864,27 +901,27 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 		}
 	}
 
-	object_post((t_object*)x, "==Current active modes==");
+	LOG_DEBUG("==Current active modes==");
 	if (x->hProductionNode[DEPTH_GEN_INDEX])
 	{
-		object_post((t_object*)x, "DepthMD FPS=%lu FullX=%lu FullY=%lu Z=%u", ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->nFPS, ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->FullRes.X, ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->FullRes.Y, ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->nZRes);
-		object_post((t_object*)x, "DepthMD OffsetX=%lu OffsetY=%lu CropX=%lu CropY=%lu", ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->Offset.X, ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->Offset.Y, ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->Res.X, ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->Res.Y);
-		object_post((t_object*)x, "DepthMD PixelFormat=%s", xnPixelFormatToString(((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->PixelFormat));
+		LOG_DEBUG("DepthMD FPS=%lu FullX=%lu FullY=%lu Z=%u", ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->nFPS, ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->FullRes.X, ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->FullRes.Y, ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->nZRes);
+		LOG_DEBUG("DepthMD OffsetX=%lu OffsetY=%lu CropX=%lu CropY=%lu", ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->Offset.X, ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->Offset.Y, ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->Res.X, ((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->Res.Y);
+		LOG_DEBUG("DepthMD PixelFormat=%s", xnPixelFormatToString(((XnDepthMetaData *)x->pMapMetaData[DEPTHMAP_OUTPUT_INDEX])->pMap->PixelFormat));
 	}
 	if (x->hProductionNode[IMAGE_GEN_INDEX])
 	{
-		object_post((t_object*)x, "ImageMD FPS=%lu X=%lu Y=%lu", ((XnImageMetaData *)x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX])->pMap->nFPS, ((XnImageMetaData *)x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX])->pMap->FullRes.X, ((XnImageMetaData *)x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX])->pMap->FullRes.Y);
-		object_post((t_object*)x, "ImageMD PixelFormat=%s", xnPixelFormatToString(((XnImageMetaData *)x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX])->pMap->PixelFormat));
+		LOG_DEBUG("ImageMD FPS=%lu X=%lu Y=%lu", ((XnImageMetaData *)x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX])->pMap->nFPS, ((XnImageMetaData *)x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX])->pMap->FullRes.X, ((XnImageMetaData *)x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX])->pMap->FullRes.Y);
+		LOG_DEBUG("ImageMD PixelFormat=%s", xnPixelFormatToString(((XnImageMetaData *)x->pMapMetaData[IMAGEMAP_OUTPUT_INDEX])->pMap->PixelFormat));
 	}
 	if (x->hProductionNode[USER_GEN_INDEX])
 	{
-		object_post((t_object*)x, "UserPixelMD FPS=%lu X=%lu Y=%lu", ((XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX])->pMap->nFPS, ((XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX])->pMap->FullRes.X, ((XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX])->pMap->FullRes.Y);
-		object_post((t_object*)x, "UserPixelMD PixelFormat=%s", xnPixelFormatToString(((XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX])->pMap->PixelFormat));
+		LOG_DEBUG("UserPixelMD FPS=%lu X=%lu Y=%lu", ((XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX])->pMap->nFPS, ((XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX])->pMap->FullRes.X, ((XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX])->pMap->FullRes.Y);
+		LOG_DEBUG("UserPixelMD PixelFormat=%s", xnPixelFormatToString(((XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX])->pMap->PixelFormat));
 	}
 	if (x->hProductionNode[IR_GEN_INDEX])
 	{
-		object_post((t_object*)x, "IrMD FPS=%lu X=%lu Y=%lu", ((XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX])->pMap->nFPS, ((XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX])->pMap->FullRes.X, ((XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX])->pMap->FullRes.Y);
-		object_post((t_object*)x, "IrMD PixelFormat=%s", xnPixelFormatToString(((XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX])->pMap->PixelFormat));
+		LOG_DEBUG("IrMD FPS=%lu X=%lu Y=%lu", ((XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX])->pMap->nFPS, ((XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX])->pMap->FullRes.X, ((XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX])->pMap->FullRes.Y);
+		LOG_DEBUG("IrMD PixelFormat=%s", xnPixelFormatToString(((XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX])->pMap->PixelFormat));
 	}
 #endif
 
@@ -1070,10 +1107,19 @@ t_jit_err jit_openni_scenefloor_get(t_jit_openni *x, void *attr, long *ac, t_ato
 	{
 		// no need to xnGetSceneMetaData()
 		xnGetFloor(x->hProductionNode[SCENE_GEN_INDEX], &planeFloor);
-		switch (x->siSkeletonValueType) // case 0 is the default native OpenNI values (real world)
+		switch (x->siSkeletonValueType)
 		{
+		case 0:		 // default native OpenNI values (real world)
+			if (x->cbDistInMeters)
+			{
+				planeFloor.ptPoint.X *= .001;
+				planeFloor.ptPoint.Y *= .001;
+				planeFloor.ptPoint.Z *= .001;
+			}
+			break;
 		case 1:		// the OpenNI projective coordinates
 			xnConvertRealWorldToProjective(x->hProductionNode[DEPTH_GEN_INDEX], 1, &(planeFloor.ptPoint), &(planeFloor.ptPoint));
+			if (x->cbDistInMeters) planeFloor.ptPoint.Z *= .001;
 			break;
 		case 2:		// legacy "normalized" OSCeleton values
 			// I do not support the legacy OSCeleton multiplier and offset, if a dev is that advanced, they can do the simple conversion to this object's native output

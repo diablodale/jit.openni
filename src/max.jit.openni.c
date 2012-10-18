@@ -64,13 +64,14 @@ int main(void)
 
 	post("jit.openni %s, Copyright (c) 2012 Dale Phurrough. This program comes with ABSOLUTELY NO WARRANTY.", JIT_OPENNI_VERSION);
 	post("jit.openni %s, Licensed under the GNU General Public License v3.0 (GPLv3) available at http://www.gnu.org/licenses/gpl-3.0.html", JIT_OPENNI_VERSION);
-	post("jit.openni %s, Compiled against OpenNI %s", JIT_OPENNI_VERSION, XN_VERSION_STRING);
-	xnGetVersion(&currentOpenNIVersion);
-	#ifdef _DEBUG
-		post("Need OpenNI (%ld) currently have OpenNI (%ld)", OPENNI_REQUIRED_VERSION, (currentOpenNIVersion.nMajor*100000000 + currentOpenNIVersion.nMinor*1000000 + currentOpenNIVersion.nMaintenance*10000 + currentOpenNIVersion.nBuild) );
-	#endif
-	if ( (currentOpenNIVersion.nMajor*100000000 + currentOpenNIVersion.nMinor*1000000 + currentOpenNIVersion.nMaintenance*10000 + currentOpenNIVersion.nBuild) < OPENNI_REQUIRED_VERSION)
-		error("jit.openni %s, Requires at least OpenNI %s. Please read the installation documentation.", JIT_OPENNI_VERSION, XN_BRIEF_VERSION_STRING);
+	post("jit.openni %s, Compiled and casual tested with OpenNI %s, NITE %s", JIT_OPENNI_VERSION, XN_BRIEF_VERSION_STRING, XNV_NITE_BRIEF_VERSION_STRING);
+
+	//xnGetVersion(&currentOpenNIVersion);
+	//#ifdef _DEBUG
+	//	post("Need OpenNI (%ld) currently have OpenNI (%ld)", OPENNI_REQUIRED_VERSION, (currentOpenNIVersion.nMajor*100000000 + currentOpenNIVersion.nMinor*1000000 + currentOpenNIVersion.nMaintenance*10000 + currentOpenNIVersion.nBuild) );
+	//#endif
+	//if ( (currentOpenNIVersion.nMajor*100000000 + currentOpenNIVersion.nMinor*1000000 + currentOpenNIVersion.nMaintenance*10000 + currentOpenNIVersion.nBuild) < OPENNI_REQUIRED_VERSION)
+	//	error("jit.openni %s, Requires at least OpenNI %s. Please read the installation documentation.", JIT_OPENNI_VERSION, XN_BRIEF_VERSION_STRING);
 
 	// initialize the Jitter class by calling Jitter class's registration function
 	jit_openni_init();
@@ -265,11 +266,11 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 	
 	if ((mypatcherpath) && (mypatcherpath != gensym(""))) 	// if I use _sym_nothing rather than gensym("") then I get linker error LNK2001: unresolved external symbol __common_symbols
 	{
-		LOG_COMMENT2("The patcher path is %s", mypatcherpath->s_name);
+		LOG_DEBUG2("The patcher path is %s", mypatcherpath->s_name);
 	}
 	else
 	{
-		LOG_COMMENT("error getting filepath symbol for max.jit.openni");
+		LOG_DEBUG("error getting filepath symbol for max.jit.openni");
 		return;
 	}
 #endif
@@ -346,19 +347,19 @@ void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 	const char strUserCoMFormatOutput[3][9] = { "/user/%u", "user", "/user/%d" };		// switchable user CoM output format selectors
 	const char strFloorFormatOutput[3][7] = { "/floor", "floor", "/floor" };			// switchable floor output format selectors
 		
-	LOG_DEBUG("starting custom outputmatrix()");
+	LOG_DEBUG("custom max_jit_openni_outputmatrix()");
 	if (outputmode && mop)
 	{
 		//always output unless output mode is none
 		if (outputmode==2) // pass input case, but since jit.openni has no input then this means no output
 		{
-			LOG_DEBUG("bypassing matrix_calc(), bypassing outputmatrix()");
+			//LOG_DEBUG("bypassing matrix_calc(), bypassing outputmatrix()");
 			return;
 		}
 
 		if (outputmode==1)
 		{
-			LOG_DEBUG("about to call matrix_calc from custom outputmatrix");
+			//LOG_DEBUG("about to call matrix_calc from custom outputmatrix");
 			if (err = (t_jit_err)jit_object_method(max_jit_obex_jitob_get(x), _jit_sym_matrix_calc,
 				  jit_object_method(mop,_jit_sym_getinputlist),
 				  jit_object_method(mop,_jit_sym_getoutputlist)))
@@ -466,9 +467,8 @@ void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 			}
 		}
 
-		LOG_DEBUG("now calling outputmatrix()");
+		//LOG_DEBUG("calling standard max_jit_mop_outputmatrix()");
 		max_jit_mop_outputmatrix(x);
-		LOG_DEBUG("called outputmatrix()");
 	}	
 }
 

@@ -1,19 +1,6 @@
 <OpenNI>
 	<Licenses>
-    <License key="0KOIk2JeIBYClPWVnMoRKn5cdY4=" vendor="PrimeSense"/>
-    <!-- Add licenses here 
-		<License vendor="vendor" key="key"/>
-		-->
 	</Licenses>
-	<Log writeToConsole="true" writeToFile="false">
-		<!-- 0 - Verbose, 1 - Info, 2 - Warning, 3 - Error (default) -->
-		<LogLevel value="2"/>
-		<Masks>
-			<Mask name="ALL" on="true"/>
-		</Masks>
-		<Dumps>
-		</Dumps>
-	</Log>
 	<ProductionNodes startGenerating="true">
 		<!--<Recording file="c:\input_file.oni" />-->
 
@@ -23,15 +10,15 @@
       </Configuration>
     </Node>
 
-    <!--
+<!--
     <Node type="IR" name="Ir1">
       <Configuration>
-        <MapOutputMode xRes="640" yRes="480" FPS="30"/>
+        <MapOutputMode xRes="320" yRes="240" FPS="30"/>
         <Mirror on="true"/>
       </Configuration>
     </Node>
-    -->
-    
+-->
+ 
     <Node type="Depth" name="Depth1">
 		  <Configuration>
         <AlternativeViewPoint>Image1</AlternativeViewPoint>

@@ -38,8 +38,8 @@
 #include "max.jit.mop.h"
 
 // jit.openni.c
-//#include "jit.common.h"
 #include "XnOpenNI.h"
+#include "XnVNiteVersion.h"
 
 //---------------------------------------------------------------------------
 // Macros
@@ -47,7 +47,7 @@
 
 #define JIT_OPENNI_VERSION_MAJOR 0
 #define JIT_OPENNI_VERSION_MINOR 7
-#define JIT_OPENNI_VERSION_INCRM 4
+#define JIT_OPENNI_VERSION_INCRM 5
 #define JIT_OPENNI_VERSION "v" \
 	XN_STRINGIFY(JIT_OPENNI_VERSION_MAJOR) "." \
 	XN_STRINGIFY(JIT_OPENNI_VERSION_MINOR) "." \
@@ -128,10 +128,10 @@
 	}
 
 #ifdef _DEBUG																
-	#define LOG_DEBUG(what) LOG_COMMENT(what)
-	#define LOG_DEBUG2(what,param1) LOG_COMMENT2(what,param1)
-	#define LOG_DEBUG3(what,param1,param2) LOG_COMMENT3(what,param1,param2)
-	#define LOG_DBGVIEW(what) {	cpost(what); }
+	#define LOG_DEBUG(what, ...)			cpost(what, __VA_ARGS__);
+	#define LOG_DEBUG2(what,param1)			cpost(what, param1)
+	#define LOG_DEBUG3(what,param1,param2)	cpost(what, param1,param2)
+	#define LOG_DBGVIEW(what)				cpost(what)
 #else
 	#define LOG_DEBUG(what)
 	#define LOG_DEBUG2(what,param1)
@@ -186,18 +186,26 @@ typedef struct _jit_openni {
 	XnNodeHandle hScriptNode;	// this will own the nodes created through loading an XML config file
 	XnNodeHandle hProductionNode[NUM_OPENNI_GENERATORS]; // this only holds production node GENERATORS!
 	boolean bHaveValidGeneratorProductionNode, bNeedPose, bHaveSkeletonSupport;
-	XnMapMetaData *pMapMetaData[NUM_OPENNI_MAPS];
+	XnDepthMetaData *pMapMetaData[NUM_OPENNI_MAPS];
 	XnUserID aUserIDs[MAX_NUM_USERS_SUPPORTED];
 	XnCallbackHandle hUserCallbacks, hCalibrationStartCallback, hCalibrationCompleteCallback, hPoseCallbacks, hUserExitCallback, hUserReEnterCallback;
 	XnChar strRequiredCalibrationPose[XN_MAX_NAME_LENGTH];
 	float fPositionConfidenceFilter, fOrientConfidenceFilter, fSkeletonSmoothingFactor;
 	char bOutputSkeletonOrientation, bOutputDepthmap, bOutputImagemap, bOutputIRmap, bOutputUserPixelsmap, bOutputSkeleton, siSkeletonValueType, bOutputSceneFloor;
 	char siSkeletonProfile;
+	char cbDistInMeters;
 	short iNumUsersSeen;
 	t_user_and_joints *pUserSkeletonJoints;
 	XnPlane3D planeFloor;
 	t_jit_linklist *pEventCallbackFunctions;
 } t_jit_openni;
+
+typedef struct _jit_openni_ndim {
+	XnMapMetaData	*pMap;
+	XnDepthPixel	*pData;		// in code, this is cast to the needed pixel type
+	char			cbDistInMeters;
+	char			cbIsDepthData;
+} t_jit_openni_ndim;
 
 typedef void (* JitOpenNIEventHandler)(t_jit_openni *x, enum JitOpenNIEvents iEventType, XnUserID userID);
 
@@ -214,9 +222,9 @@ t_jit_err		jit_openni_skelsmooth_set		(t_jit_openni *x, void *attr, long ac, t_a
 void			jit_openni_init_from_xml		(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal);
 t_jit_err		jit_openni_matrix_calc			(t_jit_openni *x, void *inputs, void *outputs);
 t_jit_err		changeMatrixOutputGivenMapMetaData(void *pMetaData, t_jit_matrix_info *pMatrixOut);
-void			copy16BitDatatoJitterMatrix		(XnDepthMetaData *pMapMetaData, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, long rowOffset);
+void			copy16BitDatatoJitterMatrix		(t_jit_openni_ndim *ndim_holder, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, long rowOffset);
 void			max_jit_openni_assist			(t_max_jit_openni *x, void *b, long io, long index, char *s);
-void			jit_openni_calculate_ndim		(XnDepthMetaData *pMapMetaData, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, t_jit_parallel_ndim_worker *para_worker);
+void			jit_openni_calculate_ndim		(t_jit_openni_ndim *ndim_holder, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, t_jit_parallel_ndim_worker *para_worker);
 t_jit_err RegisterJitOpenNIEventCallbacks		(t_jit_openni *x, JitOpenNIEventHandler funcCallback, void **pUnregister);
 t_jit_err UnregisterJitOpenNIEventCallbacks		(t_jit_openni *x, void *pUnregister);
 void XN_CALLBACK_TYPE User_NewUser				(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x);
