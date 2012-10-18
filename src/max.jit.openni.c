@@ -29,8 +29,12 @@
 // Includes
 //---------------------------------------------------------------------------
 
-#include "targetver.h"
+// #include "targetver.h"				///   ***   I commented this out for OSX  ****
+
 #include "jit.openni.h"
+//	#include "max.jit.mop.h"			///    I added these includes, may not be needed
+//	#include "jit.common.h"
+//  #include "ext_path.h"
 
 //---------------------------------------------------------------------------
 // Code
@@ -63,7 +67,8 @@ int main(void)
 	
 	post("jit.openni %s, Copyright (c) 2011 Dale Phurrough. This program comes with ABSOLUTELY NO WARRANTY.", JIT_OPENNI_VERSION);
 	post("jit.openni %s, Licensed under the GNU General Public License v3.0 (GPLv3) available at http://www.gnu.org/licenses/gpl-3.0.html", JIT_OPENNI_VERSION);
-
+	
+	
 	// initialize the Jitter class by calling Jitter class's registration function
 	jit_openni_init();
 	
@@ -92,9 +97,13 @@ int main(void)
 	max_addmethod_usurp_low((method)max_jit_openni_outputmatrix, "outputmatrix");	
 	max_addmethod_usurp_low((method)max_jit_openni_XMLConfig_read, "read");
 
+//	post("jit.openni Finished Main");
+	
 	// add an inlet/outlet assistance method; in this case the default matrix-operator (mop) assist fn 
 	addmess((method)max_jit_openni_assist, "assist", A_CANT, 0);
 	return 0;
+	
+	
 }
 
 
@@ -106,6 +115,7 @@ void *max_jit_openni_new(t_symbol *s, long argc, t_atom *argv)
 	t_max_jit_openni	*x;
 	void				*o;
 	long				i;
+	
 	
 	x = (t_max_jit_openni*)max_jit_obex_new(max_jit_openni_class, gensym("jit_openni"));
 	if (x)
@@ -189,6 +199,7 @@ void max_jit_openni_assist(t_max_jit_openni *x, void *b, long io, long index, ch
 {
 	t_jit_openni *pJit_OpenNI = (t_jit_openni *)max_jit_obex_jitob_get(x);
 
+
 	// I acknowledge the code below is redundant
 	switch (io)
 	{
@@ -229,6 +240,10 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 	char filename[MAX_FILENAME_CHARS];
 	char fullyQualifiedPathname[MAX_PATH_CHARS];
 	XnStatus nRetVal = XN_STATUS_OK;
+
+	
+//	post("jit.openni XML File Read");    ///  ******    I added this to debug     *********
+	
 	
 #ifdef _DEBUG
 	t_object *mypatcher;
@@ -278,16 +293,25 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 			atom_setsym(OutAtoms, atom_getsym(argv));
 			atom_setlong(OutAtoms + 1, 0);
 			max_jit_obex_dumpout(x, gensym("read"), 2, OutAtoms);
+	
+			post("jit.openni Can NOT find File");			
+			
 			return;
 		}
 	}
 
 	//Load file
 	atom_setsym(OutAtoms, gensym(filename));
+	
+//	post("jit.openni Load File");			 ///  ******    I added this to debug     *********
+	
 	if (path_topathname(filePathID, filename, fullyQualifiedPathname) == 0)
 	{
 		LOG_DEBUG2("asking Jitter object to load file %s", fullyQualifiedPathname);
-		jit_object_method(max_jit_obex_jitob_get(x), gensym("init_from_xml"), gensym(fullyQualifiedPathname), &nRetVal);
+		
+//		jit_object_method(max_jit_obex_jitob_get(x), gensym("init_from_xml"), gensym(fullyQualifiedPathname), &nRetVal);		
+		jit_object_method(max_jit_obex_jitob_get(x), gensym("init_from_xml"), gensym(filename), &nRetVal);    /////   ****   I tried changing it here to read xml
+		
 		if (nRetVal)
 		{
 			atom_setlong(OutAtoms + 1, 0);
@@ -320,7 +344,7 @@ void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 	// the [2] format string below should be an unsigned %u, however OSCeleton codebase incorrectly uses %d so I also use it here for compatibility
 	const char strUserCoMFormatOutput[3][9] = { "/user/%u", "user", "/user/%d" };		// switchable user CoM output format selectors
 	const char strFloorFormatOutput[3][7] = { "/floor", "floor", "/floor" };			// switchable floor output format selectors
-		
+	
 	LOG_DEBUG("starting custom outputmatrix()");
 	if (outputmode && mop)
 	{

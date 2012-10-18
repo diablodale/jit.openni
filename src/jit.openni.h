@@ -40,6 +40,8 @@
 // jit.openni.c
 //#include "jit.common.h"
 #include "XnOpenNI.h"
+#include <XnUSB.h>
+
 
 //---------------------------------------------------------------------------
 // Macros
@@ -64,6 +66,9 @@
 #define NUM_OPENNI_MISC_OUTPUTS 1	// this should be number of outputs that are not matrices from OpenNI maps and not dumpout (e.g. skeleton output)
 #define SKELETON_OUTPUT_INDEX 4
 
+	#define VID_MICROSOFT 0x45e				//		*****   I added these for Tilt Control   ******
+	#define PID_NUI_MOTOR 0x02b0			//		*****   I added these for Tilt Control   ******
+
 #define DEPTHMAP_ASSIST_TEXT "(matrix) depthmap generator"	// if adding or removing assist text definitions, update max_jit_openni_assist() in max.jit.openni.c
 #define IMAGEMAP_ASSIST_TEXT "(matrix) imagemap generator"
 #define IRMAP_ASSIST_TEXT "(matrix) irmap generator"
@@ -77,7 +82,7 @@
 #define LOG_ERROR(what)														\
 	{																		\
 		object_error((t_object*)x, what);									\
-	}
+}
 
 #define LOG_ERROR2(what, errorstring)										\
 	{																		\
@@ -132,11 +137,12 @@
 #endif
 
 #define CHECK_RC_ERROR_EXIT(rc, what)										\
-	if (rc != XN_STATUS_OK)													\
-	{																		\
-		object_error((t_object*)x, "%s (%s)", what, xnGetStatusString(rc));	\
-		return;																\
-	}
+if (rc != XN_STATUS_OK)													\
+{																		\
+object_error((t_object*)x, "%s (%s)", what, xnGetStatusString(rc));	\
+\
+return;																		\
+}
 
 //---------------------------------------------------------------------------
 // typedefs and enums
@@ -176,14 +182,14 @@ typedef struct _jit_openni {
 	void *pParent;
 	XnContext *pContext;
 	XnNodeHandle hScriptNode;	// this will own the nodes created through loading an XML config file
-	XnNodeHandle hProductionNode[NUM_OPENNI_GENERATORS]; // this only holds production node GENERATORS!
-	boolean bHaveValidGeneratorProductionNode, bNeedPose, bHaveSkeletonSupport;
+	XnNodeHandle hProductionNode[NUM_OPENNI_GENERATORS]; // this only holds production node GENERATORS
+	bool bHaveValidGeneratorProductionNode, bNeedPose, bHaveSkeletonSupport;                            ////  ***   I changed "boolean" to "bool"   
 	XnMapMetaData *pMapMetaData[NUM_OPENNI_MAPS];
 	XnUserID aUserIDs[MAX_NUM_USERS_SUPPORTED];
 	XnCallbackHandle hUserCallbacks, hCalibrationStartCallback, hCalibrationCompleteCallback, hPoseCallbacks, hUserExitCallback, hUserReEnterCallback;
 	XnChar strRequiredCalibrationPose[XN_MAX_NAME_LENGTH];
 	float fPositionConfidenceFilter, fOrientConfidenceFilter, fSkeletonSmoothingFactor;
-	char bOutputSkeletonOrientation, bOutputDepthmap, bOutputImagemap, bOutputIRmap, bOutputUserPixelsmap, bOutputSkeleton, siSkeletonValueType, bOutputSceneFloor;
+	char bOutputSkeletonOrientation, bOutputDepthmap, bOutputImagemap, bOutputIRmap, bOutputUserPixelsmap, bOutputSkeleton, siSkeletonValueType, bOutputSceneFloor,siKinectTiltAngle, siKinectLedColor;  // ***  I added siKinectTiltAngle 
 	short iNumUsersSeen;
 	t_user_and_joints *pUserSkeletonJoints;
 	XnPlane3D planeFloor;
@@ -202,6 +208,8 @@ t_jit_openni	*jit_openni_new(void *pParent);
 void			jit_openni_release_script_resources(t_jit_openni *x);
 void			jit_openni_free					(t_jit_openni *x);
 t_jit_err		jit_openni_skelsmooth_set		(t_jit_openni *x, void *attr, long ac, t_atom *av);
+t_jit_err		jit_openni_kinect_tilt_set		(t_jit_openni *x, void *attr, long ac, t_atom *av, XnStatus *nRetVal); //    ****   I added this for Kinect Tilt   ****
+t_jit_err		jit_openni_kinect_LEDcolor_set	(t_jit_openni *x, void *attr, long ac, t_atom *av, XnStatus *nRetVal); //    ****   I added this for Kinect LED   ****
 void			jit_openni_init_from_xml		(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal);
 t_jit_err		jit_openni_matrix_calc			(t_jit_openni *x, void *inputs, void *outputs);
 t_jit_err		changeMatrixOutputGivenMapMetaData(void *pMetaData, t_jit_matrix_info *pMatrixOut);
@@ -215,6 +223,11 @@ void XN_CALLBACK_TYPE User_LostUser				(XnNodeHandle hUserGenerator, XnUserID us
 void XN_CALLBACK_TYPE UserPose_PoseDetected	(XnNodeHandle hPoseCapability, const XnChar *strPose, XnUserID userID, t_jit_openni *x);
 void XN_CALLBACK_TYPE UserCalibration_CalibrationStart(XnNodeHandle hSkeletonCapability, XnUserID userID, t_jit_openni *x);
 void XN_CALLBACK_TYPE UserCalibration_CalibrationComplete(XnNodeHandle hSkeletonCapability, XnUserID userID, XnCalibrationStatus calibrationResult, t_jit_openni *x);
+
+
+// typedef void XN_CALLBACK_TYPE UserCalibration_CalibrationComplete(XnNodeHandle hSkeletonCapability, XnUserID userID, XnCalibrationStatus calibrationResult, t_jit_openni *x);
+//void XN_CALLBACK_TYPE UserCalibration_CalibrationEnd(XnNodeHandle hSkeletonCapability, XnUserID userID, XnCalibrationStatus calibrationResult, t_jit_openni *x);
+
 void XN_CALLBACK_TYPE User_Exit					(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x);
 void XN_CALLBACK_TYPE User_ReEnter				(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x);
 t_jit_err jit_openni_depthfov_get				(t_jit_openni *x, void *attr, long *ac, t_atom **av);
