@@ -29,7 +29,6 @@
 // Includes
 //---------------------------------------------------------------------------
 
-#include "targetver.h"
 #include "jit.openni.h"
 
 //---------------------------------------------------------------------------
@@ -116,7 +115,7 @@ void *max_jit_openni_new(t_symbol *s, long argc, t_atom *argv)
 	t_max_jit_openni	*x;
 	void				*o;
 	long				i;
-	
+
 	x = (t_max_jit_openni*)max_jit_obex_new(max_jit_openni_class, gensym("jit_openni"));
 	if (x)
 	{

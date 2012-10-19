@@ -37,19 +37,7 @@
     <ClCompile Include="src\dllmain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\jit.simple.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\max.jit.simple.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\max.jit.openni.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\jit.freenect.grab.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\max.jit.freenect.grab.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\jit.openni.c">

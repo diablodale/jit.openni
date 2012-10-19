@@ -29,7 +29,6 @@
 // Includes
 //---------------------------------------------------------------------------
 
-#include "targetver.h"
 #include "jit.openni.h"
 
 //---------------------------------------------------------------------------
@@ -47,7 +46,6 @@ t_jit_err jit_openni_init(void)
 	t_jit_object	*attr, *mop;
 	void			*output;
 	t_atom			a_arr[4];
-	int				i;
 
 	s_jit_openni_class = jit_class_new("jit_openni", (method)jit_openni_new, (method)jit_openni_free, sizeof(t_jit_openni), A_OBJ, 0);
 
@@ -191,8 +189,6 @@ t_jit_err jit_openni_init(void)
 	//		NULL, NULL, calcoffset(t_jit_openni, siSkeletonProfile));
 	//jit_attr_addfilterset_clip(attr,1,5,TRUE,TRUE);
 	//jit_class_addattr(s_jit_openni_class, attr);
-
-
 
 	// finalize class
 	jit_class_register(s_jit_openni_class);
@@ -338,7 +334,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 	char *out_bp;	// char* so can reference down to a single byte as needed
 	int i, j;
 	void *out_matrix[NUM_OPENNI_MAPS];
-	boolean bGotOutMatrices = true;
+	BOOLEAN bGotOutMatrices = true;
 	XnStatus nRetVal = XN_STATUS_OK;
 	XnUInt16 tmpNumUsers = MAX_NUM_USERS_SUPPORTED;
 	t_jit_openni_ndim ndim_holder;
@@ -698,9 +694,9 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 	*nRetVal = xnEnumerationErrorsAllocate(&pErrors);
 	CHECK_RC_ERROR_EXIT(*nRetVal, "jit_openni_init_from_xml: cannot allocate errors object");
 
-	// load new XML config file, BUGBUG repeatedly unloading and reloading a script with a USER node will eventually cause a crash
+	LOG_DEBUG("jit_openni_init_from_xml() about to load %s", s->s_name);
 	*nRetVal = xnContextRunXmlScriptFromFileEx(x->pContext, s->s_name, pErrors, &(x->hScriptNode));
-
+	
 	if (*nRetVal == XN_STATUS_NO_NODE_PRESENT)
 	{
 		XnChar strError[1024];
@@ -710,6 +706,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 	xnEnumerationErrorsFree(pErrors);
 	if (*nRetVal != XN_STATUS_OK)
 	{
+		LOG_DEBUG("XML config initialization open failed (%s)", xnGetStatusString(*nRetVal));
 		CHECK_RC_ERROR_EXIT(*nRetVal, "XML config initialization open failed");
 	}
 	LOG_DEBUG2("XMLconfig loaded: %s", s->s_name);
@@ -924,8 +921,10 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 		LOG_DEBUG("IrMD PixelFormat=%s", xnPixelFormatToString(((XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX])->pMap->PixelFormat));
 	}
 #endif
+} /// -----  END OF   jit_openni_init_from_xml
 
-}
+
+
 // ---------- user and skeleton generator code -----------------
 
 // register to receive callbacks for jit_open object events
