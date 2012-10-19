@@ -31,6 +31,10 @@
 // includes
 //---------------------------------------------------------------------------
 
+#ifdef WIN_VERSION
+	#include "targetver.h"
+#endif
+
 // max.jit.openni.c
 #include "ext.h"
 #include "ext_obex.h"
@@ -38,16 +42,13 @@
 #include "max.jit.mop.h"
 
 // jit.openni.c
-//#include "jit.common.h"
 #include "XnOpenNI.h"
-#include <XnUSB.h>
-
 
 //---------------------------------------------------------------------------
 // Macros
 //---------------------------------------------------------------------------
 
-#define JIT_OPENNI_VERSION "v0.7.3"
+#define JIT_OPENNI_VERSION "v0.7.3 osx-development"
 #define MAX_NUM_USERS_SUPPORTED 15		// I have not found an OpenNI API to determine the max number possible for user generators
 #define NUM_OF_SKELETON_JOINT_TYPES 24	// I have not found an OpenNI API to determine the number of joints types (head, left foot, etc.) for a user generator
 #define NUM_OPENNI_GENERATORS 5
@@ -66,9 +67,6 @@
 #define NUM_OPENNI_MISC_OUTPUTS 1	// this should be number of outputs that are not matrices from OpenNI maps and not dumpout (e.g. skeleton output)
 #define SKELETON_OUTPUT_INDEX 4
 
-	#define VID_MICROSOFT 0x45e				//		*****   I added these for Tilt Control   ******
-	#define PID_NUI_MOTOR 0x02b0			//		*****   I added these for Tilt Control   ******
-
 #define DEPTHMAP_ASSIST_TEXT "(matrix) depthmap generator"	// if adding or removing assist text definitions, update max_jit_openni_assist() in max.jit.openni.c
 #define IMAGEMAP_ASSIST_TEXT "(matrix) imagemap generator"
 #define IRMAP_ASSIST_TEXT "(matrix) irmap generator"
@@ -82,7 +80,7 @@
 #define LOG_ERROR(what)														\
 	{																		\
 		object_error((t_object*)x, what);									\
-}
+	}
 
 #define LOG_ERROR2(what, errorstring)										\
 	{																		\
@@ -125,28 +123,35 @@
 	}
 
 #ifdef _DEBUG																
-	#define LOG_DEBUG(what) LOG_COMMENT(what)
-	#define LOG_DEBUG2(what,param1) LOG_COMMENT2(what,param1)
-	#define LOG_DEBUG3(what,param1,param2) LOG_COMMENT3(what,param1,param2)
-	#define LOG_DBGVIEW(what) {	cpost(what); }
+	#define LOG_DEBUG(what, ...)			cpost(what, __VA_ARGS__);
+	#define LOG_DEBUG2(what,param1)			cpost(what, param1)
+	#define LOG_DEBUG3(what,param1,param2)	cpost(what, param1,param2)
+	#define LOG_DBGVIEW(what)				cpost(what)
 #else
-	#define LOG_DEBUG(what)
+	#define LOG_DEBUG(what, ...)
 	#define LOG_DEBUG2(what,param1)
 	#define LOG_DEBUG3(what,param1,param2)
 	#define LOG_DBGVIEW(what)
 #endif
 
 #define CHECK_RC_ERROR_EXIT(rc, what)										\
-if (rc != XN_STATUS_OK)													\
-{																		\
-object_error((t_object*)x, "%s (%s)", what, xnGetStatusString(rc));	\
-\
-return;																		\
-}
+	if (rc != XN_STATUS_OK)													\
+	{																		\
+		object_error((t_object*)x, "%s (%s)", what, xnGetStatusString(rc));	\
+		return;																\
+	}
 
 //---------------------------------------------------------------------------
 // typedefs and enums
 //---------------------------------------------------------------------------
+
+#if !defined(BOOLEAN)
+	#if defined(__BOOL_DEFINED)
+		#define BOOLEAN bool
+	#else
+		#define BOOLEAN unsigned char
+	#endif
+#endif
 
 // Max object instance data
 // Note: most instance data is in the Jitter object which we will wrap
@@ -183,13 +188,13 @@ typedef struct _jit_openni {
 	XnContext *pContext;
 	XnNodeHandle hScriptNode;	// this will own the nodes created through loading an XML config file
 	XnNodeHandle hProductionNode[NUM_OPENNI_GENERATORS]; // this only holds production node GENERATORS
-	bool bHaveValidGeneratorProductionNode, bNeedPose, bHaveSkeletonSupport;                            ////  ***   I changed "boolean" to "bool"   
+	BOOLEAN bHaveValidGeneratorProductionNode, bNeedPose, bHaveSkeletonSupport;
 	XnMapMetaData *pMapMetaData[NUM_OPENNI_MAPS];
 	XnUserID aUserIDs[MAX_NUM_USERS_SUPPORTED];
 	XnCallbackHandle hUserCallbacks, hCalibrationStartCallback, hCalibrationCompleteCallback, hPoseCallbacks, hUserExitCallback, hUserReEnterCallback;
 	XnChar strRequiredCalibrationPose[XN_MAX_NAME_LENGTH];
 	float fPositionConfidenceFilter, fOrientConfidenceFilter, fSkeletonSmoothingFactor;
-	char bOutputSkeletonOrientation, bOutputDepthmap, bOutputImagemap, bOutputIRmap, bOutputUserPixelsmap, bOutputSkeleton, siSkeletonValueType, bOutputSceneFloor,siKinectTiltAngle, siKinectLedColor;  // ***  I added siKinectTiltAngle 
+	char bOutputSkeletonOrientation, bOutputDepthmap, bOutputImagemap, bOutputIRmap, bOutputUserPixelsmap, bOutputSkeleton, siSkeletonValueType, bOutputSceneFloor;
 	short iNumUsersSeen;
 	t_user_and_joints *pUserSkeletonJoints;
 	XnPlane3D planeFloor;
@@ -203,19 +208,18 @@ typedef void (* JitOpenNIEventHandler)(t_jit_openni *x, enum JitOpenNIEvents iEv
 //---------------------------------------------------------------------------
 
 // jit.openni.c
+BEGIN_USING_C_LINKAGE
 t_jit_err		jit_openni_init(void); 
 t_jit_openni	*jit_openni_new(void *pParent);
-void			jit_openni_release_script_resources(t_jit_openni *x);
 void			jit_openni_free					(t_jit_openni *x);
-t_jit_err		jit_openni_skelsmooth_set		(t_jit_openni *x, void *attr, long ac, t_atom *av);
-t_jit_err		jit_openni_kinect_tilt_set		(t_jit_openni *x, void *attr, long ac, t_atom *av, XnStatus *nRetVal); //    ****   I added this for Kinect Tilt   ****
-t_jit_err		jit_openni_kinect_LEDcolor_set	(t_jit_openni *x, void *attr, long ac, t_atom *av, XnStatus *nRetVal); //    ****   I added this for Kinect LED   ****
-void			jit_openni_init_from_xml		(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal);
 t_jit_err		jit_openni_matrix_calc			(t_jit_openni *x, void *inputs, void *outputs);
+void			jit_openni_calculate_ndim		(XnDepthMetaData *pMapMetaData, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, t_jit_parallel_ndim_worker *para_worker);
+END_USING_C_LINKAGE
+void			jit_openni_release_script_resources(t_jit_openni *x);
+t_jit_err		jit_openni_skelsmooth_set		(t_jit_openni *x, void *attr, long ac, t_atom *av);
+void			jit_openni_init_from_xml		(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal);
 t_jit_err		changeMatrixOutputGivenMapMetaData(void *pMetaData, t_jit_matrix_info *pMatrixOut);
 void			copy16BitDatatoJitterMatrix		(XnDepthMetaData *pMapMetaData, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, long rowOffset);
-void			max_jit_openni_assist			(t_max_jit_openni *x, void *b, long io, long index, char *s);
-void			jit_openni_calculate_ndim		(XnDepthMetaData *pMapMetaData, long dimcount, long *dim, long planecount, t_jit_matrix_info *minfo1, char *bp1, t_jit_parallel_ndim_worker *para_worker);
 t_jit_err RegisterJitOpenNIEventCallbacks		(t_jit_openni *x, JitOpenNIEventHandler funcCallback, void **pUnregister);
 t_jit_err UnregisterJitOpenNIEventCallbacks		(t_jit_openni *x, void *pUnregister);
 void XN_CALLBACK_TYPE User_NewUser				(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x);
@@ -223,23 +227,19 @@ void XN_CALLBACK_TYPE User_LostUser				(XnNodeHandle hUserGenerator, XnUserID us
 void XN_CALLBACK_TYPE UserPose_PoseDetected	(XnNodeHandle hPoseCapability, const XnChar *strPose, XnUserID userID, t_jit_openni *x);
 void XN_CALLBACK_TYPE UserCalibration_CalibrationStart(XnNodeHandle hSkeletonCapability, XnUserID userID, t_jit_openni *x);
 void XN_CALLBACK_TYPE UserCalibration_CalibrationComplete(XnNodeHandle hSkeletonCapability, XnUserID userID, XnCalibrationStatus calibrationResult, t_jit_openni *x);
-
-
-// typedef void XN_CALLBACK_TYPE UserCalibration_CalibrationComplete(XnNodeHandle hSkeletonCapability, XnUserID userID, XnCalibrationStatus calibrationResult, t_jit_openni *x);
-//void XN_CALLBACK_TYPE UserCalibration_CalibrationEnd(XnNodeHandle hSkeletonCapability, XnUserID userID, XnCalibrationStatus calibrationResult, t_jit_openni *x);
-
 void XN_CALLBACK_TYPE User_Exit					(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x);
 void XN_CALLBACK_TYPE User_ReEnter				(XnNodeHandle hUserGenerator, XnUserID userID, t_jit_openni *x);
 t_jit_err jit_openni_depthfov_get				(t_jit_openni *x, void *attr, long *ac, t_atom **av);
 t_jit_err jit_openni_scenefloor_get				(t_jit_openni *x, void *attr, long *ac, t_atom **av);
 
 // max.jit.openni.c
-t_jit_err		jit_openni_init					(void);
+BEGIN_USING_C_LINKAGE
 void			*max_jit_openni_new				(t_symbol *s, long argc, t_atom *argv);
 void			max_jit_openni_free				(t_max_jit_openni *x);
-void			max_jit_openni_XMLConfig_read	(t_max_jit_openni *x, t_symbol *s, short argc, t_atom *argv);
 void			max_jit_openni_outputmatrix		(t_max_jit_openni *x);
+void			max_jit_openni_assist			(t_max_jit_openni *x, void *b, long io, long index, char *s);
+END_USING_C_LINKAGE
+void			max_jit_openni_XMLConfig_read	(t_max_jit_openni *x, t_symbol *s, short argc, t_atom *argv);
 void			max_jit_openni_post_events		(t_jit_openni *x, enum JitOpenNIEvents iEventType, XnUserID userID);
-
 
 #endif

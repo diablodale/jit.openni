@@ -29,9 +29,7 @@
 // Includes
 //---------------------------------------------------------------------------
 
-// #include "targetver.h"   ///   ****   I removed for OSX    ****
 #include "jit.openni.h"
-#include "max.jit.mop.h"
 
 //---------------------------------------------------------------------------
 // Code
@@ -41,8 +39,6 @@
 static void *s_jit_openni_class = NULL;
 
 
-XN_USB_DEV_HANDLE dev;          //  ****   for Kinect Tilt Angle
-
 /************************************************************************************/
 
 t_jit_err jit_openni_init(void) 
@@ -50,7 +46,6 @@ t_jit_err jit_openni_init(void)
 	t_jit_object	*attr, *mop;
 	void			*output;
 	t_atom			a_arr[4];
-//	int				i;				// *** Unused  ***
 
 	s_jit_openni_class = jit_class_new("jit_openni", (method)jit_openni_new, (method)jit_openni_free, sizeof(t_jit_openni), A_OBJ, 0);
 
@@ -184,18 +179,6 @@ t_jit_err jit_openni_init(void)
 			(method)jit_openni_scenefloor_get, NULL, NULL);
 	jit_class_addattr(s_jit_openni_class, attr);
 	
-	attr = jit_object_new(_jit_sym_jit_attr_offset, "kinect_tilt_angle", _jit_sym_char, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW,  // ****   I added for Kinect Tilt   ******
-				NULL, jit_openni_kinect_tilt_set, calcoffset(t_jit_openni, siKinectTiltAngle));			 // ****   I added for Kinect Tilt   ******
-	jit_attr_addfilterset_clip(attr,-31,31,TRUE,TRUE);													 // ****   I added for Kinect Tilt   ******
-	jit_class_addattr(s_jit_openni_class, attr);														 // ****   I added for Kinect Tilt   ******
-
-	
-	attr = jit_object_new(_jit_sym_jit_attr_offset, "kinect_led_color", _jit_sym_char, JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW,  // ****   I added for Kinect Tilt   ******
-				NULL, jit_openni_kinect_LEDcolor_set, calcoffset(t_jit_openni, siKinectLedColor));			 // ****   I added for Kinect Tilt   ******
-	jit_attr_addfilterset_clip(attr,0,6,TRUE,TRUE);															// ****   I added for Kinect Tilt   ******
-	jit_class_addattr(s_jit_openni_class, attr);															// ****   I added for Kinect Tilt   ******	
-	
-	
 	// finalize class
 	jit_class_register(s_jit_openni_class);
 	return JIT_ERR_NONE;
@@ -226,7 +209,6 @@ t_jit_openni *jit_openni_new(void *pParent)
 		x->bOutputSceneFloor = 0;
 		x->fSkeletonSmoothingFactor = 0.0;	//BUGBUG what is the OpenNI/NITE default?
 		x->siSkeletonValueType = 0;
-		x->siKinectTiltAngle = 0;
 		x->pEventCallbackFunctions = (t_jit_linklist *)jit_object_new(_jit_sym_jit_linklist);
 
 		LOG_DEBUG("Creating a new OpenNI context");
@@ -313,53 +295,8 @@ void jit_openni_free(t_jit_openni *x)
 		xnFreeSceneMetaData((XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX]);
 		LOG_DEBUG("Releasing OpenNI context...");
 		xnContextRelease(x->pContext);
-		
-		xnUSBCloseDevice(dev);			///  ***  closes USB Kinect Tilt
-				
 	}
 }
-
-
-///   ********************   I added this for Kinect Tilt Angle    ********
-
-t_jit_err jit_openni_kinect_tilt_set(t_jit_openni *x, void *attr, long ac, t_atom *av, XnStatus *nRetVal)
-{
-	if (ac && av)
-	{
-		x->siKinectTiltAngle = jit_atom_getfloat(av);
-	}
-	else
-	{		
-		x->siKinectTiltAngle = 0.0;			// no args, set to tilt to zero (Center)
-	}	
-		XnUChar empty[0x1]; 			
-		*nRetVal = xnUSBSendControl(dev, XN_USB_CONTROL_TYPE_VENDOR, 0x31, (XnUInt16)(x->siKinectTiltAngle * 2), 0x0,empty,0x0, 0);
-//		CHECK_RC_ERROR_EXIT(*nRetVal, "USB-Kinect_Tilt Can't Tilt");	
-
-	
-	return JIT_ERR_NONE;
-}
-
-///   ********************   I added this for Kinect LED Color    ********
-
-t_jit_err jit_openni_kinect_LEDcolor_set(t_jit_openni *x, void *attr, long ac, t_atom *av, XnStatus *nRetVal)
-{
-	if (ac && av)
-	{
-		x->siKinectLedColor = jit_atom_getfloat(av);
-	}
-	else
-	{		
-		x->siKinectLedColor = 0;			// no args, set to tilt to zero (Center)
-	}	
-		XnUChar empty[0x1]; 	
-		*nRetVal = xnUSBSendControl(dev, XN_USB_CONTROL_TYPE_VENDOR, 0x06, (XnUInt16)(x->siKinectLedColor), 0x0,empty,0x0, 0);
-//		CHECK_RC_ERROR_EXIT(*nRetVal, "USB-Kinect_Tilt Can't change LED Color");	
-	
-	return JIT_ERR_NONE;
-}
-
-
 
 t_jit_err jit_openni_skelsmooth_set(t_jit_openni *x, void *attr, long ac, t_atom *av)
 {
@@ -384,7 +321,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 	char *out_bp;	// char* so can reference down to a single byte as needed
 	int i, j, dimcount;
 	void *out_matrix[NUM_OPENNI_MAPS];
-	bool bGotOutMatrices = true;						                            ////  ***   I changed "boolean" to "bool" 
+	BOOLEAN bGotOutMatrices = true;
 	XnStatus nRetVal = XN_STATUS_OK;
 	XnUInt16 tmpNumUsers = MAX_NUM_USERS_SUPPORTED;
 #ifdef _DEBUG
@@ -392,7 +329,6 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 	long unsigned luFrameID;
 #endif
 
-	
 	if (!x->bHaveValidGeneratorProductionNode) return JIT_ERR_HW_UNAVAILABLE;
 	
 	// get the zeroth index input and output from
@@ -709,34 +645,25 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 	x->bHaveSkeletonSupport = false;
 	x->iNumUsersSeen = 0;
 
-	
 	*nRetVal = xnEnumerationErrorsAllocate(&pErrors);
 	CHECK_RC_ERROR_EXIT(*nRetVal, "jit_openni_init_from_xml: cannot allocate errors object");
 
-	
-	// load new XML config file, BUGBUG repeatedly unloading and reloading a script with a USER node will eventually cause a crash	
-	
-	//   *nRetVal = xnContextRunXmlScriptFromFileEx(x->pContext, s->s_name, pErrors, &(x->hScriptNode));      ****   I changed this   ****
-		*nRetVal = xnContextRunXmlScriptFromFileEx(x->pContext, "jit.openni_config.xml", pErrors, &(x->hScriptNode));	///    ****   to this   ****
-	
+	LOG_DEBUG("jit_openni_init_from_xml() about to load %s", s->s_name);
+	*nRetVal = xnContextRunXmlScriptFromFileEx(x->pContext, s->s_name, pErrors, &(x->hScriptNode));
 	
 	if (*nRetVal == XN_STATUS_NO_NODE_PRESENT)
 	{
 		XnChar strError[1024];
 		xnEnumerationErrorsToString(pErrors, strError, 1024);
 		LOG_ERROR2("XMLconfig initialization failed", strError);
-		
 	}
 	xnEnumerationErrorsFree(pErrors);
-	if (*nRetVal != XN_STATUS_OK)			
+	if (*nRetVal != XN_STATUS_OK)
 	{
-		post("jit.openni XML Initialize XN Status NOT OK");			//		****   I added this to debug    ******
-		
+		LOG_DEBUG("XML config initialization open failed (%s)", xnGetStatusString(*nRetVal));
 		CHECK_RC_ERROR_EXIT(*nRetVal, "XML config initialization open failed");
-		
 	}
 	LOG_DEBUG2("XMLconfig loaded: %s", s->s_name);
-	
 
 	*nRetVal = xnEnumerateExistingNodes(x->pContext,&pProductionNodeList);
 	CHECK_RC_ERROR_EXIT(*nRetVal, "XMLconfig cannot enumerate existing production nodes");
@@ -946,32 +873,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 		object_post((t_object*)x, "IrMD PixelFormat=%s", xnPixelFormatToString(((XnIRMetaData *)x->pMapMetaData[IRMAP_OUTPUT_INDEX])->pMap->PixelFormat));
 	}
 #endif
-
-
-//////	*******   I added this    	Initialize, Open, and Center Kinect Tilt    ********
-	
-//	*nRetVal = xnUSBInit();												///  *****   Not needed since USB is already intialized
-//	CHECK_RC_ERROR_EXIT(*nRetVal, "USB Tilt Can't Initialize");	
-	
-	*nRetVal = xnUSBOpenDevice(VID_MICROSOFT, PID_NUI_MOTOR, NULL, NULL, &dev);    ///  *****   Open Connection to Kinect Motor via USB
-	CHECK_RC_ERROR_EXIT(*nRetVal, "USB-Kinect_Tilt Can't Open");
-	
-    XnUChar empty[0x1]; 	
-	int		angle;		
-	angle = 0;	
-//    *nRetVal = xnUSBSendControl(dev, XN_USB_CONTROL_TYPE_VENDOR, 0x31, (XnUInt16)angle, 0x0, empty, 0x0, 0);     ///      Send Kinect to Zero Position
-//	CHECK_RC_ERROR_EXIT(*nRetVal, "USB-Kinect_Tilt Can't Tilt to 0");
-	
-	
-	int   color ;
-	color = 3;
-	XnUChar empty2[0x1]; 	
-	
-	*nRetVal = xnUSBSendControl(dev, XN_USB_CONTROL_TYPE_VENDOR, 0x06, (XnUInt16)color, 0x0,empty2,0x0, 0);
-//	CHECK_RC_ERROR_EXIT(*nRetVal, "USB-Kinect_Tilt Can't change LED Color");	
-}
-
-/// -----  END OF   jit_openni_init_from_xml
+} /// -----  END OF   jit_openni_init_from_xml
 
 
 
@@ -1079,10 +981,8 @@ void XN_CALLBACK_TYPE UserCalibration_CalibrationStart(XnNodeHandle hSkeletonCap
 	makeCallbacks(x, JITOPENNI_CALIB_START, userID);
 }
 
-
 // Callback: Finished calibration
 void XN_CALLBACK_TYPE UserCalibration_CalibrationComplete(XnNodeHandle hSkeletonCapability, XnUserID userID, XnCalibrationStatus calibrationResult, t_jit_openni *x)
-//void XN_CALLBACK_TYPE UserCalibration_CalibrationEnd(XnNodeHandle hSkeletonCapability, XnUserID userID, XnCalibrationStatus calibrationResult, t_jit_openni *x)
 {
 	if (calibrationResult == XN_CALIBRATION_STATUS_OK)
 	{
@@ -1182,4 +1082,3 @@ t_jit_err jit_openni_scenefloor_get(t_jit_openni *x, void *attr, long *ac, t_ato
 	}
 	return JIT_ERR_NONE;
 }
-
