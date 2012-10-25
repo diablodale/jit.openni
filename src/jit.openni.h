@@ -51,7 +51,7 @@
 
 #define JIT_OPENNI_VERSION_MAJOR 0
 #define JIT_OPENNI_VERSION_MINOR 7
-#define JIT_OPENNI_VERSION_INCRM 6
+#define JIT_OPENNI_VERSION_INCRM 7
 #define JIT_OPENNI_VERSION "v" \
 	XN_STRINGIFY(JIT_OPENNI_VERSION_MAJOR) "." \
 	XN_STRINGIFY(JIT_OPENNI_VERSION_MINOR) "." \
@@ -169,7 +169,7 @@ typedef struct _max_jit_openni {
 	void		*obex;
 	t_object	*osc_outlet;
 	void		*pRegistrationForEvents;
-	char		chrSkeletonOutputFormat;
+	unsigned char		chrSkeletonOutputFormat;
 } t_max_jit_openni;
 
 // enum JitOpenNIEvents must match the number/order of friendly string array defined in max.jit.openni.c
@@ -184,7 +184,7 @@ enum JitOpenNIEvents {	JITOPENNI_NEW_USER,
 };
 
 typedef struct user_and_joints {
-	short bUserSkeletonTracked;
+	XnBool bUserSkeletonTracked;
 	XnUserID userID;
 	XnSkeletonJointTransformation jointTransform[NUM_OF_SKELETON_JOINT_TYPES];
 	XnPoint3D userCoM;
@@ -197,7 +197,6 @@ typedef struct _jit_openni {
 	XnContext *pContext;
 	XnNodeHandle hScriptNode;	// this will own the nodes created through loading an XML config file
 	XnNodeHandle hProductionNode[NUM_OPENNI_GENERATORS]; // this only holds production node GENERATORS
-	BOOLEAN bHaveValidGeneratorProductionNode, bNeedPose, bHaveSkeletonSupport;
 	XnDepthMetaData *pMapMetaData[NUM_OPENNI_MAPS];
 	XnUserID aUserIDs[MAX_NUM_USERS_SUPPORTED];
 	XnCallbackHandle hUserCallbacks, hCalibrationStartCallback, hCalibrationCompleteCallback, hPoseCallbacks, hUserExitCallback, hUserReEnterCallback;
@@ -206,10 +205,11 @@ typedef struct _jit_openni {
 	char bOutputSkeletonOrientation, bOutputDepthmap, bOutputImagemap, bOutputIRmap, bOutputUserPixelsmap, bOutputSkeleton, siSkeletonValueType, bOutputSceneFloor;
 	char siSkeletonProfile;
 	char cbDistInMeters;
-	short iNumUsersSeen;
+	XnUInt16 iNumUsersSeen;
 	t_user_and_joints *pUserSkeletonJoints;
 	XnPlane3D planeFloor;
 	t_jit_linklist *pEventCallbackFunctions;
+	BOOLEAN bHaveValidGeneratorProductionNode, bNeedPose, bHaveSkeletonSupport;
 } t_jit_openni;
 
 typedef struct _jit_openni_ndim {

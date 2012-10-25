@@ -65,7 +65,7 @@ int main(void)
 	post("jit.openni %s, Licensed under the GNU General Public License v3.0 (GPLv3) available at http://www.gnu.org/licenses/gpl-3.0.html", JIT_OPENNI_VERSION);
 	post("jit.openni %s, Compiled and casual tested with OpenNI %s, NITE %s", JIT_OPENNI_VERSION, XN_BRIEF_VERSION_STRING, XNV_NITE_BRIEF_VERSION_STRING);
 
-	//xnGetVersion(&currentOpenNIVersion);
+	xnGetVersion(&currentOpenNIVersion);
 	//#ifdef _DEBUG
 	//	post("Need OpenNI (%ld) currently have OpenNI (%ld)", OPENNI_REQUIRED_VERSION, (currentOpenNIVersion.nMajor*100000000 + currentOpenNIVersion.nMinor*1000000 + currentOpenNIVersion.nMaintenance*10000 + currentOpenNIVersion.nBuild) );
 	//#endif
@@ -114,7 +114,9 @@ void *max_jit_openni_new(t_symbol *s, long argc, t_atom *argv)
 {
 	t_max_jit_openni	*x;
 	void				*o;
-	long				i;
+#ifdef _DEBUG
+	long i=0;
+#endif
 
 	x = (t_max_jit_openni*)max_jit_obex_new(max_jit_openni_class, gensym("jit_openni"));
 	if (x)
@@ -133,7 +135,7 @@ void *max_jit_openni_new(t_symbol *s, long argc, t_atom *argv)
 			x->chrSkeletonOutputFormat = 0;
 			max_jit_mop_matrix_args(x,argc,argv);
 
-			max_jit_attr_args(x, argc, argv); // process attribute arguments, like auto handling of @attribute's
+			max_jit_attr_args(x, (short)argc, argv); // process attribute arguments, like auto handling of @attribute's
 #ifdef _DEBUG
 			for (i = 0; i < argc; i++)
 			{
@@ -196,8 +198,6 @@ void max_jit_openni_free(t_max_jit_openni *x)
 
 void max_jit_openni_assist(t_max_jit_openni *x, void *b, long io, long index, char *s)
 {
-	t_jit_openni *pJit_OpenNI = (t_jit_openni *)max_jit_obex_jitob_get(x);
-
 	// I acknowledge the code below is redundant
 	switch (io)
 	{
@@ -230,7 +230,6 @@ void max_jit_openni_assist(t_max_jit_openni *x, void *b, long io, long index, ch
 
 void max_jit_openni_get_versions(t_max_jit_openni *x, t_symbol *s, short argc, t_atom *argv)
 {
-	XnVersion theVersion;
 	t_atom OutAtoms[4];
 
 	atom_setlong(OutAtoms, JIT_OPENNI_VERSION_MAJOR);
@@ -247,7 +246,6 @@ void max_jit_openni_get_versions(t_max_jit_openni *x, t_symbol *s, short argc, t
 
 void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc, t_atom *argv)
 {
-	long i;
 	t_atom OutAtoms[2];	
 	short filePathID;
 	long fileType = 'TEXT', outType;
@@ -340,7 +338,7 @@ void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 	t_atom osc_argv[16];			// max number of atoms/values after the message selector
 	char osc_string[MAX_LENGTH_STR_JOINT_NAME + 10];	// max joint string + 9 for "/skel/xx/" + terminating null
 	char *msg_selector_string;
-	int i, j, k;
+	unsigned int i, j, k;
 	const char strSkelFormatOutput[3][12] = { "/skel/%u/%s", "skel", "/joint" };		// switchable skeleton output format selectors
 	// the [2] format string below should be an unsigned %u, however OSCeleton codebase incorrectly uses %d so I also use it here for compatibility
 	const char strUserCoMFormatOutput[3][9] = { "/user/%u", "user", "/user/%d" };		// switchable user CoM output format selectors
