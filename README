@@ -47,6 +47,18 @@ Build notes-----------
   your Max SDK directory. Your OpenNI install should have already created
   the necessary environment variables for you.
 
+v0.7.8-------
+- small changes for Osx cross-compiling
+- added some debugging output
+- issing warnings if being compiled under C++
+- unifying use of booleans
+
+v0.7.7-------
+- increased warning level of VS compiler, excluded some warnings
+- minor changes to reduce harmless VS compiler warnings
+- renamed dllmain.cpp -> dllmain.c
+- fixed version retrieval
+
 v0.7.6-------
 - Osx compatibility changes now merged, it should now compile on Osx
 

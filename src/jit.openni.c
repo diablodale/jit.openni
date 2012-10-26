@@ -339,7 +339,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 	XnUInt16 tmpNumUsers = MAX_NUM_USERS_SUPPORTED;
 	t_jit_openni_ndim ndim_holder;
 #ifdef _DEBUG
-	boolean bFrameIDsInSync = true;
+	BOOLEAN bFrameIDsInSync = true;
 	long unsigned luFrameID = 0;
 #endif
 

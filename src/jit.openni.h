@@ -27,6 +27,14 @@
 #ifndef ADD_H_JIT_OPENNI
 #define ADD_H_JIT_OPENNI
 
+#ifdef __cplusplus
+	#ifdef _MSC_VER
+		#pragma message("Warning - C compiler needed, this is being erroroneously compiled with C++")
+	#else
+		#warning Warning - C compiler needed, this is being erroroneously compiled with C++
+	#endif
+#endif
+
 //---------------------------------------------------------------------------
 // includes
 //---------------------------------------------------------------------------
@@ -40,6 +48,7 @@
 #include "ext_obex.h"
 #include "jit.common.h"
 #include "max.jit.mop.h"
+#include "jpatcher_api.h"
 
 // jit.openni.c
 #include "XnOpenNI.h"
@@ -51,7 +60,7 @@
 
 #define JIT_OPENNI_VERSION_MAJOR 0
 #define JIT_OPENNI_VERSION_MINOR 7
-#define JIT_OPENNI_VERSION_INCRM 7
+#define JIT_OPENNI_VERSION_INCRM 8
 #define JIT_OPENNI_VERSION "v" \
 	XN_STRINGIFY(JIT_OPENNI_VERSION_MAJOR) "." \
 	XN_STRINGIFY(JIT_OPENNI_VERSION_MINOR) "." \
@@ -132,7 +141,11 @@
 	}
 
 #ifdef _DEBUG																
-	#define LOG_DEBUG(what, ...)			cpost(what, __VA_ARGS__);
+	#ifdef _MSC_VER
+		#define LOG_DEBUG(what, ...)			cpost(what, __VA_ARGS__)
+	#else
+		#define LOG_DEBUG(what, ...)			cpost(what, ##__VA_ARGS__)
+	#endif
 	#define LOG_DEBUG2(what,param1)			cpost(what, param1)
 	#define LOG_DEBUG3(what,param1,param2)	cpost(what, param1,param2)
 	#define LOG_DBGVIEW(what)				cpost(what)
@@ -161,6 +174,7 @@
 		#define BOOLEAN unsigned char
 	#endif
 #endif
+#define boolean BOOLEAN
 
 // Max object instance data
 // Note: most instance data is in the Jitter object which we will wrap

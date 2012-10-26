@@ -115,7 +115,7 @@ void *max_jit_openni_new(t_symbol *s, long argc, t_atom *argv)
 	t_max_jit_openni	*x;
 	void				*o;
 #ifdef _DEBUG
-	long i=0;
+	long i = 0;
 #endif
 
 	x = (t_max_jit_openni*)max_jit_obex_new(max_jit_openni_class, gensym("jit_openni"));
@@ -248,27 +248,29 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 {
 	t_atom OutAtoms[2];	
 	short filePathID;
-	long fileType = 'TEXT', outType;
+	long fileType = 'TEXT', outType = 0;	// wacko Max API for filetypes takes 4 chars hacked into a long
 	char filename[MAX_FILENAME_CHARS];
 	char fullyQualifiedPathname[MAX_PATH_CHARS];
 	XnStatus nRetVal = XN_STATUS_OK;
 	
 #ifdef _DEBUG
+	char hackpath[MAX_PATH_CHARS];			// BUGBUG remove this debug variable
+	char hackfilename[MAX_FILENAME_CHARS];	// BUGBUG remove this debug variable
 	t_object *mypatcher;
 	t_symbol *mypatcherpath;
 
 	if (object_obex_lookup(x, gensym("#P"), &mypatcher) != MAX_ERR_NONE)
 		LOG_ERROR("error getting patcher for jit.openni");
+	mypatcher = jpatcher_get_toppatcher(mypatcher);
 	mypatcherpath = object_attr_getsym(mypatcher, gensym("filepath"));
 	
-	if ((mypatcherpath) && (mypatcherpath != gensym(""))) 	// if I use _sym_nothing rather than gensym("") then I get linker error LNK2001: unresolved external symbol __common_symbols
+	if ((mypatcherpath) && (mypatcherpath != gensym("")))
 	{
-		LOG_DEBUG2("The patcher path is %s", mypatcherpath->s_name);
+		LOG_DEBUG2("The top patcher path is %s", mypatcherpath->s_name);
 	}
 	else
 	{
-		LOG_DEBUG("error getting filepath symbol for max.jit.openni");
-		return;
+		LOG_DEBUG("error getting filepath symbol for top patcher containing jit.openni");
 	}
 #endif
 
@@ -297,19 +299,27 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 		strncpy_zero(filename, atom_getsym(argv)->s_name, MAX_FILENAME_CHARS);
 		if (locatefile_extended(filename, &filePathID, &outType, &fileType, 1))
 		{
-			LOG_DEBUG2("Could not find file", atom_getsym(argv)->s_name);
+			LOG_DEBUG("Could not find file \"%s\"", atom_getsym(argv)->s_name);
 			atom_setsym(OutAtoms, atom_getsym(argv));
 			atom_setlong(OutAtoms + 1, 0);
 			max_jit_obex_dumpout(x, gensym("read"), 2, OutAtoms);
 			return;
 		}
+		LOG_DEBUG("locatefile_extended(pathid,otyp,name): %d, %.4s, \"%s\"", filePathID, (char *)&outType, filename);
 	}
+
+#ifdef _DEBUG
+		path_topathname(filePathID, NULL, hackpath);
+		LOG_DEBUG("filePathID=> \"%s\"", hackpath);
+		path_splitnames(mypatcherpath->s_name, hackpath, hackfilename);
+		LOG_DEBUG("patcher@ \"%s\" \"%s\"", hackpath, hackfilename);
+#endif
 
 	//Load file
 	atom_setsym(OutAtoms, gensym(filename));
 	if (path_topathname(filePathID, filename, fullyQualifiedPathname) == 0)
 	{
-		LOG_DEBUG2("asking Jitter object to load file %s", fullyQualifiedPathname);
+		LOG_DEBUG2("asking Jitter object to load file \"%s\"", fullyQualifiedPathname);
 		jit_object_method(max_jit_obex_jitob_get(x), gensym("init_from_xml"), gensym(fullyQualifiedPathname), &nRetVal);
 		if (nRetVal)
 		{
@@ -323,6 +333,7 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 	}
 	else
 	{
+		LOG_DEBUG("path_topathname failed with: %d,\"%s\"", filePathID, filename);
 		atom_setlong(OutAtoms + 1, 0);
 		max_jit_obex_dumpout(x, gensym("read"), 2, OutAtoms);
 	}
