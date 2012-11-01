@@ -44,9 +44,9 @@
 #endif
 
 // max.jit.openni.c
+#include "jit.common.h"		// has to be before ext.h due to deep header Max 6.0.4 SDK dependency bug regarding quicktime macro detection
 #include "ext.h"
 #include "ext_obex.h"
-#include "jit.common.h"
 #include "max.jit.mop.h"
 #include "jpatcher_api.h"
 
@@ -60,7 +60,7 @@
 
 #define JIT_OPENNI_VERSION_MAJOR 0
 #define JIT_OPENNI_VERSION_MINOR 7
-#define JIT_OPENNI_VERSION_INCRM 8
+#define JIT_OPENNI_VERSION_INCRM 9
 #define JIT_OPENNI_VERSION "v" \
 	XN_STRINGIFY(JIT_OPENNI_VERSION_MAJOR) "." \
 	XN_STRINGIFY(JIT_OPENNI_VERSION_MINOR) "." \
@@ -146,7 +146,7 @@
 	#else
 		#define LOG_DEBUG(what, ...)			cpost(what, ##__VA_ARGS__)
 	#endif
-	#define LOG_DEBUG2(what,param1)			cpost(what, param1)
+	#define LOG_DEBUG2(what,param1)			cpost(what, param1)	// TODO migrate from these old 2/3/view macros to the varadic
 	#define LOG_DEBUG3(what,param1,param2)	cpost(what, param1,param2)
 	#define LOG_DBGVIEW(what)				cpost(what)
 #else

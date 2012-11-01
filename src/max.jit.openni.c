@@ -63,8 +63,10 @@ int main(void)
 
 	post("jit.openni %s, Copyright (c) 2012 Dale Phurrough. This program comes with ABSOLUTELY NO WARRANTY.", JIT_OPENNI_VERSION);
 	post("jit.openni %s, Licensed under the GNU General Public License v3.0 (GPLv3) available at http://www.gnu.org/licenses/gpl-3.0.html", JIT_OPENNI_VERSION);
-	post("jit.openni %s, Compiled and casual tested with OpenNI %s, NITE %s", JIT_OPENNI_VERSION, XN_BRIEF_VERSION_STRING, XNV_NITE_BRIEF_VERSION_STRING);
-
+	post("jit.openni %s, Compiled and casually tested with OpenNI %s, NITE %s", JIT_OPENNI_VERSION, XN_BRIEF_VERSION_STRING, XNV_NITE_BRIEF_VERSION_STRING);
+#ifdef _DEBUG
+	post("jit.openni %s, DEBUG build %s @ %s", JIT_OPENNI_VERSION, __DATE__, __TIME__);
+#endif
 	xnGetVersion(&currentOpenNIVersion);
 	//#ifdef _DEBUG
 	//	post("Need OpenNI (%ld) currently have OpenNI (%ld)", OPENNI_REQUIRED_VERSION, (currentOpenNIVersion.nMajor*100000000 + currentOpenNIVersion.nMinor*1000000 + currentOpenNIVersion.nMaintenance*10000 + currentOpenNIVersion.nBuild) );
@@ -257,16 +259,22 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 	char hackpath[MAX_PATH_CHARS];			// BUGBUG remove this debug variable
 	char hackfilename[MAX_FILENAME_CHARS];	// BUGBUG remove this debug variable
 	t_object *mypatcher;
-	t_symbol *mypatcherpath;
+	t_symbol *mypatcherpath = NULL;
 
 	if (object_obex_lookup(x, gensym("#P"), &mypatcher) != MAX_ERR_NONE)
+	{
 		LOG_ERROR("error getting patcher for jit.openni");
-	mypatcher = jpatcher_get_toppatcher(mypatcher);
-	mypatcherpath = object_attr_getsym(mypatcher, gensym("filepath"));
-	
+	}
+	else
+	{
+		mypatcher = jpatcher_get_toppatcher(mypatcher);
+		mypatcherpath = object_attr_getsym(mypatcher, gensym("filepath"));
+	}
 	if ((mypatcherpath) && (mypatcherpath != gensym("")))
 	{
 		LOG_DEBUG2("The top patcher path is %s", mypatcherpath->s_name);
+		path_splitnames(mypatcherpath->s_name, hackpath, hackfilename);
+		LOG_DEBUG("patcher@ \"%s\" \"%s\"", hackpath, hackfilename);
 	}
 	else
 	{
@@ -310,17 +318,17 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 
 #ifdef _DEBUG
 		path_topathname(filePathID, NULL, hackpath);
-		LOG_DEBUG("filePathID=> \"%s\"", hackpath);
-		path_splitnames(mypatcherpath->s_name, hackpath, hackfilename);
-		LOG_DEBUG("patcher@ \"%s\" \"%s\"", hackpath, hackfilename);
+		LOG_DEBUG("pathIDtoName=> \"%s\"", hackpath);
 #endif
 
 	//Load file
 	atom_setsym(OutAtoms, gensym(filename));
 	if (path_topathname(filePathID, filename, fullyQualifiedPathname) == 0)
 	{
-		LOG_DEBUG2("asking Jitter object to load file \"%s\"", fullyQualifiedPathname);
-		jit_object_method(max_jit_obex_jitob_get(x), gensym("init_from_xml"), gensym(fullyQualifiedPathname), &nRetVal);
+		char nativeQualifiedPathname[MAX_PATH_CHARS];
+		path_nameconform(fullyQualifiedPathname, nativeQualifiedPathname, PATH_STYLE_NATIVE, PATH_TYPE_ABSOLUTE);
+		LOG_DEBUG2("asking Jitter object to load file \"%s\"", nativeQualifiedPathname);
+		jit_object_method(max_jit_obex_jitob_get(x), gensym("init_from_xml"), gensym(nativeQualifiedPathname), &nRetVal);
 		if (nRetVal)
 		{
 			atom_setlong(OutAtoms + 1, 0);
@@ -398,14 +406,15 @@ void max_jit_openni_outputmatrix(t_max_jit_openni *x)
 			// output user center of mass
 			switch (x->chrSkeletonOutputFormat)
 			{
-			case 0:	// default jit.openni skeleton OSC output format
-			case 2: // legacy OSCeleton format
-				snprintf_zero(osc_string, sizeof(osc_string), strUserCoMFormatOutput[x->chrSkeletonOutputFormat], pJit_OpenNI->pUserSkeletonJoints[i].userID);
-				msg_selector_string = osc_string;
-				break;
 			case 1: // native max route compatible format
 				msg_selector_string = (char *)strUserCoMFormatOutput[1];
 				atom_setlong(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].userID);
+				break;
+			case 0:		// default jit.openni skeleton OSC output format
+			case 2:		// legacy OSCeleton format
+			default:	// clearly defining the default case rids of a compiler caution
+				snprintf_zero(osc_string, sizeof(osc_string), strUserCoMFormatOutput[x->chrSkeletonOutputFormat], pJit_OpenNI->pUserSkeletonJoints[i].userID);
+				msg_selector_string = osc_string;
 				break;
 			}
 			atom_setfloat(osc_argv + (iNumAtoms++), pJit_OpenNI->pUserSkeletonJoints[i].userCoM.X);

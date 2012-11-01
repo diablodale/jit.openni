@@ -47,6 +47,11 @@ Build notes-----------
   your Max SDK directory. Your OpenNI install should have already created
   the necessary environment variables for you.
 
+v0.7.9-------
+- tweaks for Osx compiling
+- added a debug config XML that uses the skeletonrec.oni available
+  at http://openni.org downloads
+
 v0.7.8-------
 - small changes for Osx cross-compiling
 - added some debugging output
