@@ -725,7 +725,14 @@ XnStatus jit_openni_ContextRunXmlScriptEx(t_jit_openni *x, XnContext* pContext, 
 	}
 	else
 	{
+#ifdef WIN_VERSION
 		if (_chdir(sPathName) != 0)
+#else
+		char nativeQualifiedPathname[MAX_PATH_CHARS];
+		path_nameconform(sPathName, nativeQualifiedPathname, PATH_STYLE_NATIVE, PATH_TYPE_PATH);
+		LOG_DEBUG("OSx hack chdir(%s)", nativeQualifiedPathname);
+		if (chdir(nativeQualifiedPathname) != 0)
+#endif
 		{
 			LOG_DEBUG("jit_openni_ContextRunXmlScriptEx: chdir(%s) failed", sPathName);
 		}
@@ -781,7 +788,9 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 	CHECK_RC_ERROR_EXIT(*nRetVal, "XMLconfig cannot enumerate existing production nodes");
 	for (pCurrentNode = xnNodeInfoListGetFirst(pProductionNodeList); xnNodeInfoListIteratorIsValid(pCurrentNode); pCurrentNode = xnNodeInfoListGetNext(pCurrentNode))
 	{
+#ifdef _DEBUG
 		XnFieldOfView xFieldOfView;
+#endif
 		
 		pProdNodeInfo = xnNodeInfoListGetCurrent(pCurrentNode);
 		LOG_DEBUG("found prodnode type=%s", xnProductionNodeTypeToString(xnNodeInfoGetDescription(pProdNodeInfo)->Type));
