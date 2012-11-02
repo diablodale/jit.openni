@@ -41,16 +41,14 @@
 
 #ifdef WIN_VERSION
 	#include "targetver.h"
+	#include <direct.h>
 #endif
 
-// max.jit.openni.c
 #include "jit.common.h"		// has to be before ext.h due to deep header Max 6.0.4 SDK dependency bug regarding quicktime macro detection
 #include "ext.h"
 #include "ext_obex.h"
 #include "max.jit.mop.h"
 #include "jpatcher_api.h"
-
-// jit.openni.c
 #include "XnOpenNI.h"
 #include "XnVNiteVersion.h"
 
@@ -60,7 +58,7 @@
 
 #define JIT_OPENNI_VERSION_MAJOR 0
 #define JIT_OPENNI_VERSION_MINOR 8
-#define JIT_OPENNI_VERSION_INCRM 0
+#define JIT_OPENNI_VERSION_INCRM 1
 #define JIT_OPENNI_VERSION "v" \
 	XN_STRINGIFY(JIT_OPENNI_VERSION_MAJOR) "." \
 	XN_STRINGIFY(JIT_OPENNI_VERSION_MINOR) "." \
@@ -95,10 +93,11 @@
 
 #define MAKEULONGFROMCHARS(a, b, c, d) ((unsigned long)((unsigned long)a | ((unsigned long)b << 8) | ((unsigned long)c << 16) | ((unsigned long)d << 24)))
 
-#define LOG_ERROR(what)														\
-	{																		\
-		object_error((t_object*)x, what);									\
-	}
+#if defined(_MSC_VER) && defined(WIN_VERSION)	// Visual Studio on Windows
+	#define LOG_ERROR(what, ...)	object_error((t_object*)x, what, __VA_ARGS__)
+#else
+	#define LOG_ERROR(what, ...)	object_error((t_object*)x, what, ##__VA_ARGS__)
+#endif
 
 #define LOG_ERROR2(what, errorstring)										\
 	{																		\

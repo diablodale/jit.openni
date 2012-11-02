@@ -20,7 +20,8 @@
 
 jit.openni - a Max Jitter external for OpenNI middleware
 
-Full documentation is available at the wiki https://github.com/diablodale/jit.openni/wiki
+Binaries/installs at https://github.com/diablodale/jit.openni/downloads
+Documentation at the wiki https://github.com/diablodale/jit.openni/wiki
 
 Windows tested using:
 - Windows 7 64-bit Service Pack 1 (modern Win32 OSs should also work)
@@ -47,6 +48,10 @@ Build notes-----------
   With Windows and Visual Studio, set a system environment variable MAXSDK to
   your Max SDK directory. Your OpenNI install should have already created
   the necessary environment variables for you.
+
+v0.8.1
+- switched method for loading XML configuration file to aid in OSx compatibility
+- minor debug macro usage/output changes
 
 v0.8.0
 - can now cross-compile Win and OSx

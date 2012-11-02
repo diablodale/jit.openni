@@ -676,6 +676,68 @@ void jit_openni_calculate_ndim(t_jit_openni_ndim *ndim_holder, long dimcount, lo
 	}
 }
 
+// private implementation of xnContextRunXmlScriptFromFileEx due to failures of OpenNI API to run on Osx via Max external
+XnStatus jit_openni_ContextRunXmlScriptEx(t_jit_openni *x, XnContext* pContext, const XnChar* strFileName, XnEnumerationErrors* pErrors, XnNodeHandle* phScriptNode)
+{
+	t_filehandle theFile;
+	long err, fileSize;
+	short maxPathID;
+	char *fileData = NULL;
+	char maxFileName[MAX_FILENAME_CHARS], sPathName[MAX_PATH_CHARS];
+	XnStatus returnCode = XN_STATUS_OK;
+
+	err = (long)path_frompathname(strFileName, &maxPathID, maxFileName);
+	if (err)
+	{
+		LOG_DEBUG("jit_openni_ContextRunXmlScriptEx: path_frompathname failed with x%x", err);
+		return XN_STATUS_BAD_PARAM;
+	}
+	err = (long)path_opensysfile(maxFileName, maxPathID, &theFile, READ_PERM);
+	if (err)
+	{
+		LOG_DEBUG("jit_openni_ContextRunXmlScriptEx: path_opensysfile failed with x%x", err);
+		return XN_STATUS_INVALID_OPERATION;
+	}
+	err = sysfile_geteof(theFile, &fileSize);
+	if (err)
+	{
+		LOG_DEBUG("jit_openni_ContextRunXmlScriptEx: sysfile_geteof failed with x%x", err);
+		returnCode = XN_STATUS_EOF;
+		goto out_loadxmlbymem;
+	}
+	if (!(fileData = (char *)sysmem_newptr(fileSize)))
+	{
+		LOG_DEBUG("jit_openni_ContextRunXmlScriptEx: sysmem_newptr failed to allocate memory", err);
+		returnCode = XN_STATUS_INTERNAL_BUFFER_TOO_SMALL;
+		goto out_loadxmlbymem;
+	}
+	err = sysfile_read(theFile, &fileSize, fileData);
+	if (err)
+	{
+		LOG_DEBUG("jit_openni_ContextRunXmlScriptEx: sysfile_read failed with x%x", err);
+		returnCode = XN_STATUS_CORRUPT_FILE;
+		goto out_loadxmlbymem;
+	}
+	err = (long)path_topathname(maxPathID, NULL, sPathName);
+	if (err != 0)
+	{
+		LOG_DEBUG("jit_openni_ContextRunXmlScriptEx: path_topathname() failed with x%x", err);
+	}
+	else
+	{
+		if (_chdir(sPathName) != 0)
+		{
+			LOG_DEBUG("jit_openni_ContextRunXmlScriptEx: chdir(%s) failed", sPathName);
+		}
+	}
+	returnCode = xnContextRunXmlScriptEx(pContext, fileData, pErrors, phScriptNode);
+
+out_loadxmlbymem:
+	if (fileData) sysmem_freeptr(fileData);
+	sysfile_close(theFile);
+	return returnCode;
+}
+
 void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 {
 	XnEnumerationErrors* pErrors;
@@ -696,8 +758,11 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 	CHECK_RC_ERROR_EXIT(*nRetVal, "jit_openni_init_from_xml: cannot allocate errors object");
 
 	LOG_DEBUG("jit_openni_init_from_xml() about to load %s", s->s_name);
-	*nRetVal = xnContextRunXmlScriptFromFileEx(x->pContext, s->s_name, pErrors, &(x->hScriptNode));
 	
+	// TODO now forcing all to use new code for testing, may lead to dynamic generation of XML in memory for controlling via max attributes
+	//*nRetVal = xnContextRunXmlScriptFromFileEx(x->pContext, s->s_name, pErrors, &(x->hScriptNode));
+	*nRetVal = jit_openni_ContextRunXmlScriptEx(x, x->pContext, s->s_name, pErrors, &(x->hScriptNode));
+
 	if (*nRetVal == XN_STATUS_NO_NODE_PRESENT)
 	{
 		XnChar strError[1024];
@@ -707,7 +772,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 	xnEnumerationErrorsFree(pErrors);
 	if (*nRetVal != XN_STATUS_OK)
 	{
-		LOG_DEBUG("XML config initialization open failed (%s)", xnGetStatusString(*nRetVal));
+		LOG_DEBUG("XML config initialization open failed (%x) %s", *nRetVal, xnGetStatusString(*nRetVal));
 		CHECK_RC_ERROR_EXIT(*nRetVal, "XML config initialization open failed");
 	}
 	LOG_DEBUG("XMLconfig loaded: %s", s->s_name);
