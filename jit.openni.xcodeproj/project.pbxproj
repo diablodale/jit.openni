@@ -1,0 +1,353 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		DD08713B1641AECD000AE38A /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = DD0871391641AECD000AE38A /* InfoPlist.strings */; };
+		DD0871571641DD01000AE38A /* max.jit.openni.c in Sources */ = {isa = PBXBuildFile; fileRef = DD0871561641DD01000AE38A /* max.jit.openni.c */; };
+		DD0871591641DD12000AE38A /* jit.openni.c in Sources */ = {isa = PBXBuildFile; fileRef = DD0871581641DD12000AE38A /* jit.openni.c */; };
+		DD08715B1641F5FA000AE38A /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DD08715A1641F5FA000AE38A /* Carbon.framework */; };
+		DD0871631642126E000AE38A /* MaxAPI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DD0871621642126E000AE38A /* MaxAPI.framework */; };
+		DD0871651642128E000AE38A /* JitterAPI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DD0871641642128E000AE38A /* JitterAPI.framework */; };
+		DD9560A816435B4C0021A0CF /* README in Resources */ = {isa = PBXBuildFile; fileRef = DD9560A716435B4C0021A0CF /* README */; };
+		DD9560AB16435B660021A0CF /* COPYING.txt in Resources */ = {isa = PBXBuildFile; fileRef = DD9560AA16435B650021A0CF /* COPYING.txt */; };
+		DD9560AE16435B880021A0CF /* jit.openni_config.xml in Resources */ = {isa = PBXBuildFile; fileRef = DD9560AC16435B880021A0CF /* jit.openni_config.xml */; };
+		DD9560AF16435B880021A0CF /* jit.openni_debugrec.xml in Resources */ = {isa = PBXBuildFile; fileRef = DD9560AD16435B880021A0CF /* jit.openni_debugrec.xml */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		DD0871311641AECC000AE38A /* jit.openni.mxo */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = jit.openni.mxo; sourceTree = BUILT_PRODUCTS_DIR; };
+		DD0871381641AECD000AE38A /* jit.openni-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "jit.openni-Info.plist"; path = "src/jit.openni-Info.plist"; sourceTree = SOURCE_ROOT; };
+		DD08713A1641AECD000AE38A /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		DD0871541641DCD5000AE38A /* jit.openni.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; lineEnding = 2; name = jit.openni.h; path = src/jit.openni.h; sourceTree = SOURCE_ROOT; usesTabs = 1; wrapsLines = 0; };
+		DD0871561641DD01000AE38A /* max.jit.openni.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; lineEnding = 2; name = max.jit.openni.c; path = src/max.jit.openni.c; sourceTree = SOURCE_ROOT; usesTabs = 1; wrapsLines = 0; };
+		DD0871581641DD12000AE38A /* jit.openni.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; lineEnding = 2; name = jit.openni.c; path = src/jit.openni.c; sourceTree = SOURCE_ROOT; usesTabs = 1; wrapsLines = 0; };
+		DD08715A1641F5FA000AE38A /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = System/Library/Frameworks/Carbon.framework; sourceTree = SDKROOT; };
+		DD0871621642126E000AE38A /* MaxAPI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MaxAPI.framework; path = "../MaxSDK-6.0.4/c74support/max-includes/MaxAPI.framework"; sourceTree = "<group>"; };
+		DD0871641642128E000AE38A /* JitterAPI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JitterAPI.framework; path = "../MaxSDK-6.0.4/c74support/jit-includes/JitterAPI.framework"; sourceTree = "<group>"; };
+		DD9560A716435B4C0021A0CF /* README */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; lineEnding = 2; path = README; sourceTree = SOURCE_ROOT; usesTabs = 1; };
+		DD9560AA16435B650021A0CF /* COPYING.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; lineEnding = 2; path = COPYING.txt; sourceTree = SOURCE_ROOT; usesTabs = 1; };
+		DD9560AC16435B880021A0CF /* jit.openni_config.xml */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xml; lineEnding = 2; name = jit.openni_config.xml; path = bin/jit.openni_config.xml; sourceTree = SOURCE_ROOT; usesTabs = 1; };
+		DD9560AD16435B880021A0CF /* jit.openni_debugrec.xml */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xml; lineEnding = 2; name = jit.openni_debugrec.xml; path = bin/jit.openni_debugrec.xml; sourceTree = SOURCE_ROOT; usesTabs = 1; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		DD08712E1641AECC000AE38A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DD08715B1641F5FA000AE38A /* Carbon.framework in Frameworks */,
+				DD0871631642126E000AE38A /* MaxAPI.framework in Frameworks */,
+				DD0871651642128E000AE38A /* JitterAPI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		DD0871261641AECC000AE38A = {
+			isa = PBXGroup;
+			children = (
+				DD0871361641AECC000AE38A /* jit.openni */,
+				DD0871331641AECC000AE38A /* Frameworks */,
+				DD0871321641AECC000AE38A /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		DD0871321641AECC000AE38A /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				DD0871311641AECC000AE38A /* jit.openni.mxo */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		DD0871331641AECC000AE38A /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				DD0871641642128E000AE38A /* JitterAPI.framework */,
+				DD0871621642126E000AE38A /* MaxAPI.framework */,
+				DD08715A1641F5FA000AE38A /* Carbon.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		DD0871361641AECC000AE38A /* jit.openni */ = {
+			isa = PBXGroup;
+			children = (
+				DD0871581641DD12000AE38A /* jit.openni.c */,
+				DD0871561641DD01000AE38A /* max.jit.openni.c */,
+				DD0871541641DCD5000AE38A /* jit.openni.h */,
+				DD0871371641AECD000AE38A /* Supporting Files */,
+			);
+			path = jit.openni;
+			sourceTree = "<group>";
+		};
+		DD0871371641AECD000AE38A /* Supporting Files */ = {
+			isa = PBXGroup;
+			children = (
+				DD9560AC16435B880021A0CF /* jit.openni_config.xml */,
+				DD9560AD16435B880021A0CF /* jit.openni_debugrec.xml */,
+				DD9560AA16435B650021A0CF /* COPYING.txt */,
+				DD9560A716435B4C0021A0CF /* README */,
+				DD0871381641AECD000AE38A /* jit.openni-Info.plist */,
+				DD0871391641AECD000AE38A /* InfoPlist.strings */,
+			);
+			name = "Supporting Files";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		DD0871301641AECC000AE38A /* jit.openni */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DD08713F1641AECD000AE38A /* Build configuration list for PBXNativeTarget "jit.openni" */;
+			buildPhases = (
+				DD08712D1641AECC000AE38A /* Sources */,
+				DD08712E1641AECC000AE38A /* Frameworks */,
+				DD08712F1641AECC000AE38A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = jit.openni;
+			productName = jit.openni;
+			productReference = DD0871311641AECC000AE38A /* jit.openni.mxo */;
+			productType = "com.apple.product-type.bundle";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		DD0871281641AECC000AE38A /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0450;
+				ORGANIZATIONNAME = "Dale Phurrough";
+			};
+			buildConfigurationList = DD08712B1641AECC000AE38A /* Build configuration list for PBXProject "jit.openni" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = DD0871261641AECC000AE38A;
+			productRefGroup = DD0871321641AECC000AE38A /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				DD0871301641AECC000AE38A /* jit.openni */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		DD08712F1641AECC000AE38A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DD08713B1641AECD000AE38A /* InfoPlist.strings in Resources */,
+				DD9560A816435B4C0021A0CF /* README in Resources */,
+				DD9560AB16435B660021A0CF /* COPYING.txt in Resources */,
+				DD9560AE16435B880021A0CF /* jit.openni_config.xml in Resources */,
+				DD9560AF16435B880021A0CF /* jit.openni_debugrec.xml in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		DD08712D1641AECC000AE38A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DD0871571641DD01000AE38A /* max.jit.openni.c in Sources */,
+				DD0871591641DD12000AE38A /* jit.openni.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXVariantGroup section */
+		DD0871391641AECD000AE38A /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				DD08713A1641AECD000AE38A /* en */,
+			);
+			name = InfoPlist.strings;
+			path = src;
+			sourceTree = SOURCE_ROOT;
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		DD08713D1641AECD000AE38A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
+				C74SUPPORT = "/Users/dalep/Documents/xcode/MaxSDK-6.0.4/c74support";
+				CLANG_ANALYZER_SECURITY_FLOATLOOPCOUNTER = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COMBINE_HIDPI_IMAGES = YES;
+				COPY_PHASE_STRIP = NO;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(C74SUPPORT)/max-includes",
+					"$(C74SUPPORT)/msp-includes",
+					"$(C74SUPPORT)/jit-includes",
+				);
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"_DEBUG=1",
+					"DENORM_WANT_FIX=1",
+					"$(inherited)",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_MISSING_PARENTHESES = NO;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_PKGINFO_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					/usr/include/ni,
+					/Developer/Headers/FlatCarbon,
+					/usr/include/nite,
+				);
+				INFOPLIST_EXPAND_BUILD_SETTINGS = YES;
+				LD_RUNPATH_SEARCH_PATHS = "";
+				LIBRARY_SEARCH_PATHS = "";
+				MACOSX_DEPLOYMENT_TARGET = 10.7;
+				ONLY_ACTIVE_ARCH = YES;
+				OTHER_LDFLAGS = /usr/lib/libOpenNI.dylib;
+				SDKROOT = macosx10.7;
+				USER_HEADER_SEARCH_PATHS = "$(C74SUPPORT)/max-includes $(C74SUPPORT)/msp-includes $(C74SUPPORT)/jit-includes";
+				WARNING_CFLAGS = (
+					"-Wno-extra-tokens",
+					"-Wno-attributes",
+				);
+				WRAPPER_EXTENSION = mxo;
+			};
+			name = Debug;
+		};
+		DD08713E1641AECD000AE38A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
+				C74SUPPORT = "/Users/dalep/Documents/xcode/MaxSDK-6.0.4/c74support";
+				CLANG_ANALYZER_SECURITY_FLOATLOOPCOUNTER = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COMBINE_HIDPI_IMAGES = YES;
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(C74SUPPORT)/max-includes",
+					"$(C74SUPPORT)/msp-includes",
+					"$(C74SUPPORT)/jit-includes",
+				);
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = "DENORM_WANT_FIX=1";
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_MISSING_PARENTHESES = NO;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_PKGINFO_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					/usr/include/ni,
+					/Developer/Headers/FlatCarbon,
+					/usr/include/nite,
+				);
+				INFOPLIST_EXPAND_BUILD_SETTINGS = YES;
+				LD_RUNPATH_SEARCH_PATHS = "";
+				LIBRARY_SEARCH_PATHS = "";
+				MACOSX_DEPLOYMENT_TARGET = 10.7;
+				OTHER_LDFLAGS = /usr/lib/libOpenNI.dylib;
+				SDKROOT = macosx10.7;
+				USER_HEADER_SEARCH_PATHS = "$(C74SUPPORT)/max-includes $(C74SUPPORT)/msp-includes $(C74SUPPORT)/jit-includes";
+				WARNING_CFLAGS = (
+					"-Wno-extra-tokens",
+					"-Wno-attributes",
+				);
+				WRAPPER_EXTENSION = mxo;
+			};
+			name = Release;
+		};
+		DD0871401641AECD000AE38A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/../MaxSDK-6.0.4/c74support/max-includes\"",
+					"\"$(SRCROOT)/../MaxSDK-6.0.4/c74support/jit-includes\"",
+				);
+				INFOPLIST_FILE = "src/jit.openni-Info.plist";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Bundles";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/../MaxSDK-6.0.4/c74support/max-includes/MaxAPI.framework/Versions/A\"",
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		DD0871411641AECD000AE38A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/../MaxSDK-6.0.4/c74support/max-includes\"",
+					"\"$(SRCROOT)/../MaxSDK-6.0.4/c74support/jit-includes\"",
+				);
+				INFOPLIST_FILE = "src/jit.openni-Info.plist";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Bundles";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/../MaxSDK-6.0.4/c74support/max-includes/MaxAPI.framework/Versions/A\"",
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		DD08712B1641AECC000AE38A /* Build configuration list for PBXProject "jit.openni" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DD08713D1641AECD000AE38A /* Debug */,
+				DD08713E1641AECD000AE38A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DD08713F1641AECD000AE38A /* Build configuration list for PBXNativeTarget "jit.openni" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DD0871401641AECD000AE38A /* Debug */,
+				DD0871411641AECD000AE38A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = DD0871281641AECC000AE38A /* Project object */;
+}
