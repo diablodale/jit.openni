@@ -13,10 +13,6 @@
 		DD08715B1641F5FA000AE38A /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DD08715A1641F5FA000AE38A /* Carbon.framework */; };
 		DD0871631642126E000AE38A /* MaxAPI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DD0871621642126E000AE38A /* MaxAPI.framework */; };
 		DD0871651642128E000AE38A /* JitterAPI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DD0871641642128E000AE38A /* JitterAPI.framework */; };
-		DD9560A816435B4C0021A0CF /* README in Resources */ = {isa = PBXBuildFile; fileRef = DD9560A716435B4C0021A0CF /* README */; };
-		DD9560AB16435B660021A0CF /* COPYING.txt in Resources */ = {isa = PBXBuildFile; fileRef = DD9560AA16435B650021A0CF /* COPYING.txt */; };
-		DD9560AE16435B880021A0CF /* jit.openni_config.xml in Resources */ = {isa = PBXBuildFile; fileRef = DD9560AC16435B880021A0CF /* jit.openni_config.xml */; };
-		DD9560AF16435B880021A0CF /* jit.openni_debugrec.xml in Resources */ = {isa = PBXBuildFile; fileRef = DD9560AD16435B880021A0CF /* jit.openni_debugrec.xml */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -152,10 +148,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				DD08713B1641AECD000AE38A /* InfoPlist.strings in Resources */,
-				DD9560A816435B4C0021A0CF /* README in Resources */,
-				DD9560AB16435B660021A0CF /* COPYING.txt in Resources */,
-				DD9560AE16435B880021A0CF /* jit.openni_config.xml in Resources */,
-				DD9560AF16435B880021A0CF /* jit.openni_debugrec.xml in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -197,7 +189,6 @@
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_WARN_EMPTY_BODY = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = NO;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(C74SUPPORT)/max-includes",
@@ -254,7 +245,6 @@
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_WARN_EMPTY_BODY = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				FRAMEWORK_SEARCH_PATHS = (
@@ -294,6 +284,7 @@
 		DD0871401641AECD000AE38A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"\"$(SRCROOT)/../MaxSDK-6.0.4/c74support/max-includes\"",
@@ -312,6 +303,7 @@
 		DD0871411641AECD000AE38A /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"\"$(SRCROOT)/../MaxSDK-6.0.4/c74support/max-includes\"",

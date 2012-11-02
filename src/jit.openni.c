@@ -662,8 +662,9 @@ void jit_openni_calculate_ndim(t_jit_openni_ndim *ndim_holder, long dimcount, lo
 															// TODO add support for long, float32, float64 output matrices
 						bp1[j] = *pMapData++;
 						break;
-					// case XN_PIXEL_FORMAT_GRAYSCALE_16_BIT is now handled below by calling a shared function copy16BitDatatoJitterMatrix()
-					// case XN_PIXEL_FORMAT_MJPEG is not handled
+					case XN_PIXEL_FORMAT_GRAYSCALE_16_BIT:	// now handled below by calling a shared function copy16BitDatatoJitterMatrix()
+					case XN_PIXEL_FORMAT_MJPEG:				// BUGBUG not handled or supported
+						break;
 				}
 			}
 			bp1 += minfo1->dimstride[1];
@@ -773,9 +774,9 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 			break;
 		case XN_NODE_TYPE_USER:
 			x->hProductionNode[USER_GEN_INDEX] = xnNodeInfoGetRefHandle(pProdNodeInfo);
-			xnRegisterUserCallbacks(x->hProductionNode[USER_GEN_INDEX], User_NewUser, User_LostUser, x, &(x->hUserCallbacks));
-			xnRegisterToUserExit(x->hProductionNode[USER_GEN_INDEX], User_Exit, x, &(x->hUserExitCallback));
-			xnRegisterToUserReEnter(x->hProductionNode[USER_GEN_INDEX], User_ReEnter, x, &(x->hUserReEnterCallback));
+			xnRegisterUserCallbacks(x->hProductionNode[USER_GEN_INDEX], (XnUserHandler)User_NewUser, (XnUserHandler)User_LostUser, x, &(x->hUserCallbacks));
+			xnRegisterToUserExit(x->hProductionNode[USER_GEN_INDEX], (XnUserHandler)User_Exit, x, &(x->hUserExitCallback));
+			xnRegisterToUserReEnter(x->hProductionNode[USER_GEN_INDEX], (XnUserHandler)User_ReEnter, x, &(x->hUserReEnterCallback));
 			xnGetUserPixels(x->hProductionNode[USER_GEN_INDEX], 0, (XnSceneMetaData *)x->pMapMetaData[USERPIXELMAP_OUTPUT_INDEX]);
 			x->bHaveValidGeneratorProductionNode = true;
 
@@ -789,7 +790,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 						if (xnIsCapabilitySupported(x->hProductionNode[USER_GEN_INDEX], XN_CAPABILITY_POSE_DETECTION))
 						{
 							LOG_DEBUG("user generator supports %u poses", xnGetNumberOfPoses(x->hProductionNode[USER_GEN_INDEX]));
-							xnRegisterToPoseDetected(x->hProductionNode[USER_GEN_INDEX], UserPose_PoseDetected, x, &(x->hPoseCallbacks)); 
+							xnRegisterToPoseDetected(x->hProductionNode[USER_GEN_INDEX], (XnPoseDetectionCallback)UserPose_PoseDetected, x, &(x->hPoseCallbacks));
 							xnGetSkeletonCalibrationPose(x->hProductionNode[USER_GEN_INDEX], x->strRequiredCalibrationPose);
 							x->bNeedPose = true;
 							x->bHaveSkeletonSupport = true;
@@ -808,8 +809,8 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 						xnSetSkeletonProfile(x->hProductionNode[USER_GEN_INDEX], (XnSkeletonProfile)x->siSkeletonProfile);
 						// TODO xnEnumerateActiveJoints() and store so later in matrix_calc will only retrieve those joints. Need to them pass the
 						// active joint list back to the max wrapper so it only iterates over them.
-						xnRegisterToCalibrationStart(x->hProductionNode[USER_GEN_INDEX], UserCalibration_CalibrationStart, x, &(x->hCalibrationStartCallback));
-						xnRegisterToCalibrationComplete(x->hProductionNode[USER_GEN_INDEX], UserCalibration_CalibrationComplete, x, &(x->hCalibrationCompleteCallback));
+						xnRegisterToCalibrationStart(x->hProductionNode[USER_GEN_INDEX], (XnCalibrationStart)UserCalibration_CalibrationStart, x, &(x->hCalibrationStartCallback));
+						xnRegisterToCalibrationComplete(x->hProductionNode[USER_GEN_INDEX], (XnCalibrationComplete)UserCalibration_CalibrationComplete, x, &(x->hCalibrationCompleteCallback));
 						x->pUserSkeletonJoints = (t_user_and_joints *)sysmem_newptr(sizeof(t_user_and_joints) * MAX_NUM_USERS_SUPPORTED);
 						xnSetSkeletonSmoothing(x->hProductionNode[USER_GEN_INDEX],x->fSkeletonSmoothingFactor);
 					}
