@@ -166,7 +166,7 @@ void *max_jit_openni_new(t_symbol *s, long argc, t_atom *argv)
 			}
 			else
 			{
-				LOG_DEBUG2("jit.openni: successfully registered for jit.openni event callbacks w/ regID=%x", x->pRegistrationForEvents);
+				LOG_DEBUG("jit.openni: successfully registered for jit.openni event callbacks w/ regID=%x", x->pRegistrationForEvents);
 			}
 		}
 		else
@@ -272,7 +272,7 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 	}
 	if ((mypatcherpath) && (mypatcherpath != gensym("")))
 	{
-		LOG_DEBUG2("The top patcher path is %s", mypatcherpath->s_name);
+		LOG_DEBUG("The top patcher path is %s", mypatcherpath->s_name);
 		path_splitnames(mypatcherpath->s_name, hackpath, hackfilename);
 		LOG_DEBUG("patcher@ \"%s\" \"%s\"", hackpath, hackfilename);
 	}
@@ -327,7 +327,7 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 	{
 		char nativeQualifiedPathname[MAX_PATH_CHARS];
 		path_nameconform(fullyQualifiedPathname, nativeQualifiedPathname, PATH_STYLE_NATIVE, PATH_TYPE_ABSOLUTE);
-		LOG_DEBUG2("asking Jitter object to load file \"%s\"", nativeQualifiedPathname);
+		LOG_DEBUG("asking Jitter object to load file \"%s\"", nativeQualifiedPathname);
 		jit_object_method(max_jit_obex_jitob_get(x), gensym("init_from_xml"), gensym(nativeQualifiedPathname), &nRetVal);
 		if (nRetVal)
 		{

@@ -293,7 +293,7 @@ void jit_openni_release_script_resources(t_jit_openni *x)
 		xnProductionNodeRelease(x->hScriptNode);			//BUGBUG this is not thread safe, matrix_calc could be running elsewhere
 		x->hScriptNode = NULL;
 	}
-	LOG_DBGVIEW("Just released script resources");
+	LOG_DEBUG("Just released script resources");
 }
 
 void jit_openni_free(t_jit_openni *x)
@@ -351,7 +351,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 	{
 		if (!(out_matrix[i] = jit_object_method(outputs,_jit_sym_getindex,i)))
 		{
-			LOG_DEBUG2("could not get output [%d] matrix", i);
+			LOG_DEBUG("could not get output [%d] matrix", i);
 			bGotOutMatrices = false;
 		}
 	}
@@ -441,7 +441,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 						if (x->bOutputSkeleton)
 						{
 							xnGetUsers(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs, &tmpNumUsers);
-							//LOG_DEBUG2("Current num of users=%d", tmpNumUsers);
+							//LOG_DEBUG("Current num of users=%d", tmpNumUsers);
 							for (j=0; j<tmpNumUsers; j++)
 							{
 								int iJoint;
@@ -709,7 +709,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 		LOG_DEBUG("XML config initialization open failed (%s)", xnGetStatusString(*nRetVal));
 		CHECK_RC_ERROR_EXIT(*nRetVal, "XML config initialization open failed");
 	}
-	LOG_DEBUG2("XMLconfig loaded: %s", s->s_name);
+	LOG_DEBUG("XMLconfig loaded: %s", s->s_name);
 
 	*nRetVal = xnEnumerateExistingNodes(x->pContext,&pProductionNodeList);
 	CHECK_RC_ERROR_EXIT(*nRetVal, "XMLconfig cannot enumerate existing production nodes");
@@ -718,8 +718,8 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 		XnFieldOfView xFieldOfView;
 		
 		pProdNodeInfo = xnNodeInfoListGetCurrent(pCurrentNode);
-		LOG_DEBUG2("found prodnode type=%s", xnProductionNodeTypeToString(xnNodeInfoGetDescription(pProdNodeInfo)->Type));
-		LOG_DEBUG2("Derived from map=%s", xnIsTypeDerivedFrom(xnNodeInfoGetDescription(pProdNodeInfo)->Type, XN_NODE_TYPE_MAP_GENERATOR) ? "true":"false");
+		LOG_DEBUG("found prodnode type=%s", xnProductionNodeTypeToString(xnNodeInfoGetDescription(pProdNodeInfo)->Type));
+		LOG_DEBUG("Derived from map=%s", xnIsTypeDerivedFrom(xnNodeInfoGetDescription(pProdNodeInfo)->Type, XN_NODE_TYPE_MAP_GENERATOR) ? "true":"false");
 
 		switch(xnNodeInfoGetDescription(pProdNodeInfo)->Type)
 		{
@@ -732,14 +732,14 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 			x->bHaveValidGeneratorProductionNode = true;
 #ifdef _DEBUG
 			xnGetDepthFieldOfView(x->hProductionNode[DEPTH_GEN_INDEX], &xFieldOfView);
-			LOG_DEBUG3("Depth FOV Horz=%f Vert=%f", xFieldOfView.fHFOV, xFieldOfView.fVFOV);
+			LOG_DEBUG("Depth FOV Horz=%f Vert=%f", xFieldOfView.fHFOV, xFieldOfView.fVFOV);
 			if (xnIsCapabilitySupported(x->hProductionNode[DEPTH_GEN_INDEX], XN_CAPABILITY_USER_POSITION))
 			{
 				unsigned int uUserPos, i;
 				XnBoundingBox3D box;
 
 				uUserPos = xnGetSupportedUserPositionsCount(x->hProductionNode[DEPTH_GEN_INDEX]);
-				LOG_DEBUG2("Depth generator supports (%u) user position optimizations", uUserPos);
+				LOG_DEBUG("Depth generator supports (%u) user position optimizations", uUserPos);
 				for (i=0; i<uUserPos; i++)
 				{
 					*nRetVal = xnGetUserPosition(x->hProductionNode[DEPTH_GEN_INDEX], i, &box);
@@ -788,7 +788,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 					{
 						if (xnIsCapabilitySupported(x->hProductionNode[USER_GEN_INDEX], XN_CAPABILITY_POSE_DETECTION))
 						{
-							LOG_DEBUG2("user generator supports %u poses", xnGetNumberOfPoses(x->hProductionNode[USER_GEN_INDEX]));
+							LOG_DEBUG("user generator supports %u poses", xnGetNumberOfPoses(x->hProductionNode[USER_GEN_INDEX]));
 							xnRegisterToPoseDetected(x->hProductionNode[USER_GEN_INDEX], UserPose_PoseDetected, x, &(x->hPoseCallbacks)); 
 							xnGetSkeletonCalibrationPose(x->hProductionNode[USER_GEN_INDEX], x->strRequiredCalibrationPose);
 							x->bNeedPose = true;
@@ -826,11 +826,11 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 			}
 			break;
 		default:
-			LOG_DEBUG2("found unsupported node type", xnProductionNodeTypeToString(xnNodeInfoGetDescription(pProdNodeInfo)->Type));
+			LOG_DEBUG("found unsupported node type", xnProductionNodeTypeToString(xnNodeInfoGetDescription(pProdNodeInfo)->Type));
 		}
 	}
 	xnNodeInfoListFree(pProductionNodeList);
-	LOG_DEBUG2("bHaveValidGeneratorProductionNode=%s", (x->bHaveValidGeneratorProductionNode ? "true": "false"));
+	LOG_DEBUG("bHaveValidGeneratorProductionNode=%s", (x->bHaveValidGeneratorProductionNode ? "true": "false"));
 
 	*nRetVal = xnStartGeneratingAll(x->pContext);
 	CHECK_RC_ERROR_EXIT(*nRetVal, "XMLconfig cannot start all generator nodes");
@@ -843,7 +843,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 		if (depthMapModes = (XnMapOutputMode *)sysmem_newptr(sizeof(XnMapOutputMode) * numDepthMapModes))
 		{
 			xnGetSupportedMapOutputModes(x->hProductionNode[DEPTH_GEN_INDEX], depthMapModes, &numDepthMapModes);
-			LOG_DEBUG2("== %lu Depth modes avail==", numDepthMapModes);
+			LOG_DEBUG("== %lu Depth modes avail==", numDepthMapModes);
 			for (i=0; i<numDepthMapModes; i++)
 			{
 				LOG_DEBUG("FPS=%lu X=%lu Y=%lu Z=%u", depthMapModes[i].nFPS, depthMapModes[i].nXRes, depthMapModes[i].nYRes, xnGetDeviceMaxDepth(x->hProductionNode[DEPTH_GEN_INDEX]));
@@ -860,7 +860,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 		if (imageMapModes = (XnMapOutputMode *)sysmem_newptr(sizeof(XnMapOutputMode) * numImageMapModes))
 		{
 			xnGetSupportedMapOutputModes(x->hProductionNode[IMAGE_GEN_INDEX], imageMapModes, &numImageMapModes);
-			LOG_DEBUG2("== %lu Image modes avail==", numImageMapModes);
+			LOG_DEBUG("== %lu Image modes avail==", numImageMapModes);
 			for (i=0; i<numImageMapModes; i++)
 			{
 				LOG_DEBUG("FPS=%lu X=%lu Y=%lu", imageMapModes[i].nFPS, imageMapModes[i].nXRes, imageMapModes[i].nYRes);
@@ -889,7 +889,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 		if (IrMapModes = (XnMapOutputMode *)sysmem_newptr(sizeof(XnMapOutputMode) * numIrMapModes))
 		{
 			xnGetSupportedMapOutputModes(x->hProductionNode[IR_GEN_INDEX], IrMapModes, &numIrMapModes);
-			LOG_DEBUG2("== %lu IR modes avail==", numIrMapModes);
+			LOG_DEBUG("== %lu IR modes avail==", numIrMapModes);
 			for (i=0; i<numIrMapModes; i++)
 			{
 				object_post((t_object*)x, "FPS=%lu X=%lu Y=%lu", IrMapModes[i].nFPS, IrMapModes[i].nXRes, IrMapModes[i].nYRes);
@@ -931,7 +931,7 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 t_jit_err RegisterJitOpenNIEventCallbacks(t_jit_openni *x, JitOpenNIEventHandler funcCallback, void **hUnregister)
 {
 	// TODO make a critical region critical_enter() for navigating the linked list in register and unregister
-	LOG_DEBUG2("starting size of linklist=%ld", jit_linklist_getsize(x->pEventCallbackFunctions));
+	LOG_DEBUG("starting size of linklist=%ld", jit_linklist_getsize(x->pEventCallbackFunctions));
 	if ( jit_linklist_append(x->pEventCallbackFunctions, funcCallback) == -1)		// TODO, I want to use jit_linklist_insertindex() here but it crashes on an empty list
 	{
 		return JIT_ERR_OUT_OF_MEM;
@@ -939,24 +939,24 @@ t_jit_err RegisterJitOpenNIEventCallbacks(t_jit_openni *x, JitOpenNIEventHandler
 	else
 	{
 		*hUnregister = jit_linklist_index2ptr(x->pEventCallbackFunctions, jit_linklist_objptr2index(x->pEventCallbackFunctions, funcCallback));	// this is not thread safe, however, Max APIs are limiting me
-		LOG_DEBUG3("added regid=%x, ending size of linklist=%ld", *hUnregister, jit_linklist_getsize(x->pEventCallbackFunctions));
+		LOG_DEBUG("added regid=%x, ending size of linklist=%ld", *hUnregister, jit_linklist_getsize(x->pEventCallbackFunctions));
 	}
 	return JIT_ERR_NONE;
 }
 
 t_jit_err UnregisterJitOpenNIEventCallbacks(t_jit_openni *x, void *pUnregister)
 {
-	LOG_DEBUG2("unregister: starting size of linklist=%ld", jit_linklist_getsize(x->pEventCallbackFunctions));
-	LOG_DEBUG2("unregister: About to unregister using RegID=%x", pUnregister);
+	LOG_DEBUG("unregister: starting size of linklist=%ld", jit_linklist_getsize(x->pEventCallbackFunctions));
+	LOG_DEBUG("unregister: About to unregister using RegID=%x", pUnregister);
 	if (jit_linklist_chuckptr(x->pEventCallbackFunctions, pUnregister) == -1)
 	{
 		LOG_DEBUG("linklist_delete returned an error");
-		LOG_DEBUG2("unregister: ending size of linklist=%ld", jit_linklist_getsize(x->pEventCallbackFunctions));
+		LOG_DEBUG("unregister: ending size of linklist=%ld", jit_linklist_getsize(x->pEventCallbackFunctions));
 		return JIT_ERR_OUT_OF_BOUNDS;
 	}
 	else
 	{
-		LOG_DEBUG2("unregister: ending size of linklist=%ld", jit_linklist_getsize(x->pEventCallbackFunctions));
+		LOG_DEBUG("unregister: ending size of linklist=%ld", jit_linklist_getsize(x->pEventCallbackFunctions));
 		return JIT_ERR_NONE;
 	}
 }

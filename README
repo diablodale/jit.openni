@@ -33,12 +33,13 @@ Windows tested using:
 - Max SDK 6.0.4 for Windows
 
 Osx testing using:
-- OSX 10.6.8 (Snow Leopard)
-- XCode
+- OSX 10.8.2
+- XCode 4.5.1
+- Max 6.0.7 for Osx
+- Max SDK 6.0.4 for Osx
 - OpenNI 1.5.4.0 for Osx
 - PrimeSense NITE 1.5.2.21 for Osx
-- Max 6.0.7 for Osx
-- Max SDK 5.1.7 for Osx
+- PrimeSense Sensor KinectMod v0.93 for OSx (based on 5.1.2.1)
 
 Build notes-----------
 - You will need to change the build's include and library directories to match
@@ -46,6 +47,11 @@ Build notes-----------
   With Windows and Visual Studio, set a system environment variable MAXSDK to
   your Max SDK directory. Your OpenNI install should have already created
   the necessary environment variables for you.
+
+v0.8.0
+- can now cross-compile Win and OSx
+- included Visual Studio and XCode project files
+- cleaned up/unified debug output statements
 
 v0.7.9-------
 - tweaks for Osx compiling

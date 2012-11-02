@@ -59,8 +59,8 @@
 //---------------------------------------------------------------------------
 
 #define JIT_OPENNI_VERSION_MAJOR 0
-#define JIT_OPENNI_VERSION_MINOR 7
-#define JIT_OPENNI_VERSION_INCRM 9
+#define JIT_OPENNI_VERSION_MINOR 8
+#define JIT_OPENNI_VERSION_INCRM 0
 #define JIT_OPENNI_VERSION "v" \
 	XN_STRINGIFY(JIT_OPENNI_VERSION_MAJOR) "." \
 	XN_STRINGIFY(JIT_OPENNI_VERSION_MINOR) "." \
@@ -140,20 +140,26 @@
 		object_post((t_object*)x, what, param1, param2);					\
 	}
 
+
+// Max 6.0.7 or earlier cpost() fails when run on OSx 10.8.x; it is a known Max/OS issue
+// the fix, is to run a newer Max version on debug builds or an older OSx
+// the workaround is to define CPOSTOFF in your preprocessor build settings
 #ifdef _DEBUG																
-	#ifdef _MSC_VER
-		#define LOG_DEBUG(what, ...)			cpost(what, __VA_ARGS__)
+	#if defined(_MSC_VER) && defined(WIN_VERSION)	// Visual Studio on Windows
+		#if defined(CPOSTOFF)
+			#define LOG_DEBUG(what, ...)	post(what, __VA_ARGS__)
+		#else
+			#define LOG_DEBUG(what, ...)	cpost(what, __VA_ARGS__)
+		#endif
 	#else
-		#define LOG_DEBUG(what, ...)			cpost(what, ##__VA_ARGS__)
+		#if defined(CPOSTOFF)
+			#define LOG_DEBUG(what, ...)	post(what, ##__VA_ARGS__)
+		#else
+			#define LOG_DEBUG(what, ...)	cpost(what, ##__VA_ARGS__)
+		#endif
 	#endif
-	#define LOG_DEBUG2(what,param1)			cpost(what, param1)	// TODO migrate from these old 2/3/view macros to the varadic
-	#define LOG_DEBUG3(what,param1,param2)	cpost(what, param1,param2)
-	#define LOG_DBGVIEW(what)				cpost(what)
 #else
 	#define LOG_DEBUG(what, ...)
-	#define LOG_DEBUG2(what,param1)
-	#define LOG_DEBUG3(what,param1,param2)
-	#define LOG_DBGVIEW(what)
 #endif
 
 #define CHECK_RC_ERROR_EXIT(rc, what)										\
