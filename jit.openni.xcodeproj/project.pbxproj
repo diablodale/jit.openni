@@ -230,10 +230,10 @@
 				INFOPLIST_EXPAND_BUILD_SETTINGS = YES;
 				LD_RUNPATH_SEARCH_PATHS = "";
 				LIBRARY_SEARCH_PATHS = "";
-				MACOSX_DEPLOYMENT_TARGET = 10.7;
+				MACOSX_DEPLOYMENT_TARGET = 10.6;
 				ONLY_ACTIVE_ARCH = YES;
 				OTHER_LDFLAGS = /usr/lib/libOpenNI.dylib;
-				SDKROOT = macosx10.7;
+				SDKROOT = macosx;
 				USER_HEADER_SEARCH_PATHS = "$(C74SUPPORT)/max-includes $(C74SUPPORT)/msp-includes $(C74SUPPORT)/jit-includes";
 				WARNING_CFLAGS = (
 					"-Wno-extra-tokens",
@@ -279,9 +279,9 @@
 				INFOPLIST_EXPAND_BUILD_SETTINGS = YES;
 				LD_RUNPATH_SEARCH_PATHS = "";
 				LIBRARY_SEARCH_PATHS = "";
-				MACOSX_DEPLOYMENT_TARGET = 10.7;
+				MACOSX_DEPLOYMENT_TARGET = 10.6;
 				OTHER_LDFLAGS = /usr/lib/libOpenNI.dylib;
-				SDKROOT = macosx10.7;
+				SDKROOT = macosx;
 				USER_HEADER_SEARCH_PATHS = "$(C74SUPPORT)/max-includes $(C74SUPPORT)/msp-includes $(C74SUPPORT)/jit-includes";
 				WARNING_CFLAGS = (
 					"-Wno-extra-tokens",
