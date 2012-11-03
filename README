@@ -45,9 +45,17 @@ Osx testing using:
 Build notes-----------
 - You will need to change the build's include and library directories to match
   the locations of your Max SDK and OpenNI SDK.
-  With Windows and Visual Studio, set a system environment variable MAXSDK to
+- With Windows and Visual Studio, set a system environment variable MAXSDK to
   your Max SDK directory. Your OpenNI install should have already created
   the necessary environment variables for you.
+- With XCode on Mac OSx, update the custom build setting called C74SUPPORT.
+  Edit that setting so it is the directory that is the c74directory that is
+  in the Max SDK. As a check, the 3 children of this directory are the
+  three: jit-includes,max-includes,msp-includes
+
+v0.8.2
+- first working OSx port, needs testing to verify all features work
+- reformatted the current directory call for OSx compatibility
 
 v0.8.1
 - switched method for loading XML configuration file to aid in OSx compatibility
