@@ -1,10 +1,9 @@
 <OpenNI>
-	<Licenses>
-		<!-- Add application-specific licenses here 
-		<License vendor="vendor" key="key"/>
-		-->
-	</Licenses>
-	<Log writeToConsole="true" writeToFile="false">
+  <!-- We recommend you NOT have a <Licenses> section unless absolutely necessary
+       A NITE license has already been registered as part of the NITE install.
+       Having an empty <Licenses> section might cause that license to be ignored
+       and lead to an error. -->
+  <Log writeToConsole="true" writeToFile="false">
 		<!-- 0 - Verbose, 1 - Info, 2 - Warning, 3 - Error (default) -->
 		<LogLevel value="0"/>
 		<Masks>
@@ -13,26 +12,11 @@
 		<Dumps>
 		</Dumps>
 	</Log>
-	<ProductionNodes>
-		<!-- Uncomment following line, in order to run from a recording -->
-		<Recording file="skeletonrec.oni" />
+
+  <ProductionNodes>
+
+    <Recording file="skeletonrec.oni" />
 		<Node type="User" />
 	
-		<!-- GlobalMirror on="true" -->
-<!--		
-		<Node type="Depth" name="MyDepth">
-			<Configuration>
-				<MapOutputMode xRes="640" yRes="480" FPS="30"/> 
-			</Configuration>
-		</Node>
-		
-		<Node type="Image" stopOnError="false" />
--->
-		<!-- Uncomment nodes from here if you need them.
-		<Node type="Audio" />
-		<Node type="Hands" />
-		<Node type="Gesture" />
-		<Node type="Scene" />
-		-->
 	</ProductionNodes>
 </OpenNI>

@@ -23,35 +23,61 @@ jit.openni - a Max Jitter external for OpenNI middleware
 Binaries/installs at https://github.com/diablodale/jit.openni/downloads
 Documentation at the wiki https://github.com/diablodale/jit.openni/wiki
 
-Windows tested using:
-- Windows 7 64-bit Service Pack 1 (modern Win32 OSs should also work)
-- Microsoft Visual C++ 2010 Express Version 10.0.40219.1 SP1Rel
-- Hotfix for Microsoft Visual C++ 2010 Express - KB2635973, KB2542054
+Windows casually tested using:
+- Windows 7 64-bit Service Pack 1 (modern Win32 compatible OSs should also work)
 - OpenNI 1.5.4.0 for Win32
 - PrimeSense NITE 1.5.2.21 for Win32
 - PrimeSense Sensor KinectMod v0.93 for Win32 (based on 5.1.2.1)
 - Max 6.0.7 for Windows
+
+Windows additional requirements for compiling jit.openni:
+- Microsoft Visual C++ 2010 Express Version 10.0.40219.1 SP1Rel
+- Hotfix for Microsoft Visual C++ 2010 Express - KB2635973, KB2542054
+- OpenNI 1.5.4.0 development install for Win32
+- PrimeSense NITE 1.5.2.21 development install for Win32
 - Max SDK 6.0.4 for Windows
 
-Osx testing using:
-- OSX 10.8.2
-- XCode 4.5.1
-- Max 6.0.7 for Osx
-- Max SDK 6.0.4 for Osx
-- OpenNI 1.5.4.0 for Osx
-- PrimeSense NITE 1.5.2.21 for Osx
+Mac OSx casually tested using:
+- OSx 10.8.2, 10.7.2, and 10.6.8
+- Max 6.0.7 for OSx
+- libusb-1.0.9
+- OpenNI 1.5.4.0 for OSx
+- PrimeSense NITE 1.5.2.21 for OSx
 - PrimeSense Sensor KinectMod v0.93 for OSx (based on 5.1.2.1)
+
+Mac OSx install notes:
+- run and install the libusb-1.0.9 package
+- download and expand OpenNI
+- sudo ./install.sh
+- download and expand NITE
+- sudo ./install.sh
+- download and expand SensorKinect
+- sudo ./install.sh
+
+Mac OSx additional requirements for compiling jit.openni:
+- XCode (4.5.2 on OSx 10.8.2) or (3.2.6 on OSx 10.6.8)
+  the compiler command line tools must also be installed
+- http://www.macports.org/install.php
+  use the package installer method for your specific OSx
+- sudo port install libtool
+- sudo port install libusb +universal
+- Max SDK 6.0.4 for OSx
+
 
 Build notes-----------
 - You will need to change the build's include and library directories to match
   the locations of your Max SDK and OpenNI SDK.
-- With Windows and Visual Studio, set a system environment variable MAXSDK to
-  your Max SDK directory. Your OpenNI install should have already created
-  the necessary environment variables for you.
-- With XCode on Mac OSx, update the custom build setting called C74SUPPORT.
-  Edit that setting so it is the directory that is the c74directory that is
-  in the Max SDK. As a check, the 3 children of this directory are the
-  three: jit-includes,max-includes,msp-includes
+- With Microsoft Visual Studio, set a system environment variable C74SUPPORT to
+  your Max SDK support directory. With XCode on Mac OSx, update the custom build
+  setting called C74SUPPORT. Edit these settings so their value is the directory
+  that is the c74support directory that is within in the Max SDK. As a check,
+  the 3 children of this needed directory are the three: jit-includes, max-includes,
+  msp-includes.
+
+v0.8.3 fixed corrupt XML file issue due to <licenses> tag
+- removed <licenses> tag from both XML config files, added warning
+- updated some debug output
+- updated install steps
 
 v0.8.2
 - first working OSx port, needs testing to verify all features work

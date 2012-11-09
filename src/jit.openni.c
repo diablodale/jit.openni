@@ -718,6 +718,8 @@ XnStatus jit_openni_ContextRunXmlScriptEx(t_jit_openni *x, XnContext* pContext, 
 		returnCode = XN_STATUS_CORRUPT_FILE;
 		goto out_loadxmlbymem;
 	}
+	LOG_DEBUG("jit_openni_ContextRunXmlScriptEx: XML text loaded into tmp buffer");
+
 	err = (long)path_topathname(maxPathID, NULL, sPathName);
 	if (err != 0)
 	{
@@ -726,11 +728,12 @@ XnStatus jit_openni_ContextRunXmlScriptEx(t_jit_openni *x, XnContext* pContext, 
 	else
 	{
 #ifdef WIN_VERSION
+		LOG_DEBUG("chdir(%s)", sPathName);
 		if (_chdir(sPathName) != 0)
 #else
 		char nativeQualifiedPathname[MAX_PATH_CHARS];
 		path_nameconform(sPathName, nativeQualifiedPathname, PATH_STYLE_NATIVE, PATH_TYPE_PATH);
-		LOG_DEBUG("OSx hack chdir(%s)", nativeQualifiedPathname);
+		LOG_DEBUG("chdir(%s)", nativeQualifiedPathname);
 		if (chdir(nativeQualifiedPathname) != 0)
 #endif
 		{
@@ -745,6 +748,7 @@ out_loadxmlbymem:
 	return returnCode;
 }
 
+// BUGBUG there is a crashing bug if you switch XML config files while also banging jit.openni
 void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 {
 	XnEnumerationErrors* pErrors;

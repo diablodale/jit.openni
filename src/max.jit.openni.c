@@ -307,7 +307,7 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 		strncpy_zero(filename, atom_getsym(argv)->s_name, MAX_FILENAME_CHARS);
 		if (locatefile_extended(filename, &filePathID, &outType, &fileType, 1))
 		{
-			LOG_DEBUG("Could not find file \"%s\"", atom_getsym(argv)->s_name);
+			LOG_DEBUG("locatefile_extended() failed finding \"%s\"", atom_getsym(argv)->s_name);
 			atom_setsym(OutAtoms, atom_getsym(argv));
 			atom_setlong(OutAtoms + 1, 0);
 			max_jit_obex_dumpout(x, gensym("read"), 2, OutAtoms);
