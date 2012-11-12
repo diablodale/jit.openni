@@ -705,7 +705,7 @@ XnStatus jit_openni_ContextRunXmlScriptEx(t_jit_openni *x, XnContext* pContext, 
 		returnCode = XN_STATUS_EOF;
 		goto out_loadxmlbymem;
 	}
-	if (!(fileData = (char *)sysmem_newptr(fileSize)))
+	if (!(fileData = (char *)sysmem_newptr(fileSize+1)))
 	{
 		LOG_DEBUG("jit_openni_ContextRunXmlScriptEx: sysmem_newptr failed to allocate memory", err);
 		returnCode = XN_STATUS_INTERNAL_BUFFER_TOO_SMALL;
@@ -718,8 +718,15 @@ XnStatus jit_openni_ContextRunXmlScriptEx(t_jit_openni *x, XnContext* pContext, 
 		returnCode = XN_STATUS_CORRUPT_FILE;
 		goto out_loadxmlbymem;
 	}
+	fileData[fileSize] = 0;	// null terminate the string
+	
 	LOG_DEBUG("jit_openni_ContextRunXmlScriptEx: XML text loaded into tmp buffer");
-
+//TODO remove the following mass debug output
+	LOG_DEBUG("XML[60]: %.60s", fileData);
+	LOG_DEBUG("XML[-60]: %s", &(fileData[fileSize-60]));
+	//BUGBUG if I remove the IR section from the XML, it works with no corruption problem
+	// is there a problem inside the openni load api, perhaps their string buffer is too small?
+	
 	err = (long)path_topathname(maxPathID, NULL, sPathName);
 	if (err != 0)
 	{
