@@ -60,7 +60,6 @@
       <PreprocessorDefinitions>WIN_VERSION;WIN_EXT_VERSION;WIN32;_DEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(C74SUPPORT)\max-includes;$(C74SUPPORT)\msp-includes;$(C74SUPPORT)\jit-includes;$(OPEN_NI_INCLUDE);$(XN_NITE_INSTALL_PATH)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <StringPooling>true</StringPooling>
-      <ExceptionHandling>false</ExceptionHandling>
       <StructMemberAlignment>2Bytes</StructMemberAlignment>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
@@ -72,8 +71,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(C74SUPPORT)\max-includes;$(C74SUPPORT)\msp-includes;$(C74SUPPORT)\jit-includes;$(OPEN_NI_LIB);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ModuleDefinitionFile>.\src\$(ProjectName).def</ModuleDefinitionFile>
-      <IgnoreSpecificDefaultLibraries>MSVCRTD.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
-      <AdditionalDependencies>openni.lib;MaxAPI.lib;maxcrt.lib;jitlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>openni.lib;MaxAPI.lib;jitlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <DataExecutionPrevention>false</DataExecutionPrevention>
@@ -94,7 +92,6 @@
       <OmitFramePointers>true</OmitFramePointers>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <StringPooling>true</StringPooling>
-      <ExceptionHandling>false</ExceptionHandling>
       <StructMemberAlignment>2Bytes</StructMemberAlignment>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
@@ -107,9 +104,8 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>$(C74SUPPORT)\max-includes;$(C74SUPPORT)\msp-includes;$(C74SUPPORT)\jit-includes;$(OPEN_NI_LIB);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ModuleDefinitionFile>.\src\$(ProjectName).def</ModuleDefinitionFile>
-      <AdditionalDependencies>openni.lib;MaxAPI.lib;maxcrt.lib;jitlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>openni.lib;MaxAPI.lib;jitlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
-      <IgnoreSpecificDefaultLibraries>MSVCRT.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <DataExecutionPrevention>false</DataExecutionPrevention>
     </Link>
@@ -128,7 +124,7 @@
     <ClInclude Include="src\targetver.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\dllmain.c">
+    <ClCompile Include="src\dllmain.cpp">
       <CompileAsManaged Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</CompileAsManaged>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
       </PrecompiledHeader>

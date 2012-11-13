@@ -676,6 +676,28 @@ void jit_openni_calculate_ndim(t_jit_openni_ndim *ndim_holder, long dimcount, lo
 	}
 }
 
+void jit_openni_chdir(char *sOrigPath)
+{
+	char sPath[MAX_PATH_CHARS];
+	char sNativeQualifiedPathname[MAX_PATH_CHARS];
+	char sFilename[MAX_FILENAME_CHARS];
+	short pathID;
+
+	LOG_DEBUG("jit_openni_chdir(%s)", sOrigPath);
+	path_frompathname(sOrigPath, &pathID, sFilename);	// path_splitnames() was unreliable with knowing if the last term is a file or a directory even if ended with (black)slash
+	path_topathname(pathID, NULL, sPath);
+	path_nameconform(sPath, sNativeQualifiedPathname, PATH_STYLE_NATIVE, PATH_TYPE_PATH);
+	LOG_DEBUG("nativized chdir(%s)", sNativeQualifiedPathname);
+#ifdef WIN_VERSION
+	if (_chdir(sNativeQualifiedPathname) != 0)
+#else
+	if (chdir(sNativeQualifiedPathname) != 0)
+#endif
+	{
+		LOG_DEBUG("jit_openni_chdir(%s) failed", sNativeQualifiedPathname);
+	}
+}
+
 // private implementation of xnContextRunXmlScriptFromFileEx due to failures of OpenNI API to run on Osx via Max external
 XnStatus jit_openni_ContextRunXmlScriptEx(t_jit_openni *x, XnContext* pContext, const XnChar* strFileName, XnEnumerationErrors* pErrors, XnNodeHandle* phScriptNode)
 {
@@ -719,34 +741,9 @@ XnStatus jit_openni_ContextRunXmlScriptEx(t_jit_openni *x, XnContext* pContext, 
 		goto out_loadxmlbymem;
 	}
 	fileData[fileSize] = 0;	// null terminate the string
-	
 	LOG_DEBUG("jit_openni_ContextRunXmlScriptEx: XML text loaded into tmp buffer");
-//TODO remove the following mass debug output
-	LOG_DEBUG("XML[60]: %.60s", fileData);
-	LOG_DEBUG("XML[-60]: %s", &(fileData[fileSize-60]));
-	//BUGBUG if I remove the IR section from the XML, it works with no corruption problem
-	// is there a problem inside the openni load api, perhaps their string buffer is too small?
 	
-	err = (long)path_topathname(maxPathID, NULL, sPathName);
-	if (err != 0)
-	{
-		LOG_DEBUG("jit_openni_ContextRunXmlScriptEx: path_topathname() failed with x%x", err);
-	}
-	else
-	{
-#ifdef WIN_VERSION
-		LOG_DEBUG("chdir(%s)", sPathName);
-		if (_chdir(sPathName) != 0)
-#else
-		char nativeQualifiedPathname[MAX_PATH_CHARS];
-		path_nameconform(sPathName, nativeQualifiedPathname, PATH_STYLE_NATIVE, PATH_TYPE_PATH);
-		LOG_DEBUG("chdir(%s)", nativeQualifiedPathname);
-		if (chdir(nativeQualifiedPathname) != 0)
-#endif
-		{
-			LOG_DEBUG("jit_openni_ContextRunXmlScriptEx: chdir(%s) failed", sPathName);
-		}
-	}
+	jit_openni_chdir((char *)strFileName);
 	returnCode = xnContextRunXmlScriptEx(pContext, fileData, pErrors, phScriptNode);
 
 out_loadxmlbymem:
@@ -776,10 +773,14 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 	CHECK_RC_ERROR_EXIT(*nRetVal, "jit_openni_init_from_xml: cannot allocate errors object");
 
 	LOG_DEBUG("jit_openni_init_from_xml() about to load %s", s->s_name);
-	
-	// TODO now forcing all to use new code for testing, may lead to dynamic generation of XML in memory for controlling via max attributes
-	//*nRetVal = xnContextRunXmlScriptFromFileEx(x->pContext, s->s_name, pErrors, &(x->hScriptNode));
+
+#ifdef WIN_VERSION
+	jit_openni_chdir(s->s_name);
+	*nRetVal = xnContextRunXmlScriptFromFileEx(x->pContext, s->s_name, pErrors, &(x->hScriptNode));
+#else
+	// TODO try to get Windows to use this codepath, could lead to dynamic generation of XML in memory for controlling via max attributes
 	*nRetVal = jit_openni_ContextRunXmlScriptEx(x, x->pContext, s->s_name, pErrors, &(x->hScriptNode));
+#endif
 
 	if (*nRetVal == XN_STATUS_NO_NODE_PRESENT)
 	{

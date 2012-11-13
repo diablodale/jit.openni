@@ -61,6 +61,7 @@ int main(void)
 	void *p, *q;
 	t_jit_object	*attr;
 
+	LOG_DEBUG("max.jit_openni.main()");
 	post("jit.openni %s, Copyright (c) 2012 Dale Phurrough. This program comes with ABSOLUTELY NO WARRANTY.", JIT_OPENNI_VERSION);
 	post("jit.openni %s, Licensed under the GNU General Public License v3.0 (GPLv3) available at http://www.gnu.org/licenses/gpl-3.0.html", JIT_OPENNI_VERSION);
 	post("jit.openni %s, Compiled and casually tested with OpenNI %s, NITE %s", JIT_OPENNI_VERSION, XN_BRIEF_VERSION_STRING, XNV_NITE_BRIEF_VERSION_STRING);

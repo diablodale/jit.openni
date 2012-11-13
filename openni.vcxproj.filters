@@ -40,7 +40,7 @@
     <ClCompile Include="src\jit.openni.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\dllmain.c">
+    <ClCompile Include="src\dllmain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

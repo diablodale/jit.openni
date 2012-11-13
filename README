@@ -74,6 +74,17 @@ Build notes-----------
   the 3 children of this needed directory are the three: jit-includes, max-includes,
   msp-includes.
 
+v0.8.5 split XML file loading methods Win/OSx
+- split the XML file loading methods Win <-> Mac OSx
+- removed some unneed nodes in the config XML file
+- changed dllmain.c to dllmain.cpp while attempting to capture OpenNI log
+- removed some unneeded compiler/linker options
+
+v0.8.4 fixed null-terminated string missing on XML path
+- fixed bug where pathname of XML file was missing
+  terminating null
+- re-indented the XML config file
+
 v0.8.3 fixed corrupt XML file issue due to <licenses> tag
 - removed <licenses> tag from both XML config files, added warning
 - updated some debug output

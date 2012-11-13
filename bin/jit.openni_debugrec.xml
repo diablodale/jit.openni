@@ -3,7 +3,7 @@
        A NITE license has already been registered as part of the NITE install.
        Having an empty <Licenses> section might cause that license to be ignored
        and lead to an error. -->
-  <Log writeToConsole="true" writeToFile="false">
+  <Log writeToConsole="true" writeToFile="true">
 		<!-- 0 - Verbose, 1 - Info, 2 - Warning, 3 - Error (default) -->
 		<LogLevel value="0"/>
 		<Masks>
