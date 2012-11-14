@@ -30,12 +30,27 @@
 				"box" : 				{
 					"fontname" : "Arial",
 					"fontsize" : 12.0,
+					"frgb" : 0.0,
+					"id" : "obj-42",
+					"linecount" : 2,
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 591.0, 84.0, 324.0, 34.0 ],
+					"text" : "Download http://openni.org/downloads/skeletonrec.oni to test using this debugrec.xml"
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"fontname" : "Arial",
+					"fontsize" : 12.0,
 					"id" : "obj-3",
 					"maxclass" : "message",
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 413.0, 150.0, 165.0, 18.0 ],
+					"patching_rect" : [ 420.0, 84.0, 165.0, 18.0 ],
 					"text" : "read jit.openni_debugrec.xml"
 				}
 
@@ -49,7 +64,7 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 375.0, 120.0, 35.0, 18.0 ],
+					"patching_rect" : [ 382.0, 30.0, 35.0, 18.0 ],
 					"text" : "read"
 				}
 
@@ -545,7 +560,7 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 413.0, 120.0, 147.0, 18.0 ],
+					"patching_rect" : [ 420.0, 30.0, 165.0, 18.0 ],
 					"text" : "read jit.openni_config.xml"
 				}
 
