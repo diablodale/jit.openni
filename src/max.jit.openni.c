@@ -327,8 +327,13 @@ void max_jit_openni_XMLConfig_read(t_max_jit_openni *x, t_symbol *s, short argc,
 	if (path_topathname(filePathID, filename, fullyQualifiedPathname) == 0)
 	{
 		char nativeQualifiedPathname[MAX_PATH_CHARS];
+		LOG_DEBUG("fullyQualPath=%s", fullyQualifiedPathname);
+#ifdef WIN_VERSION
 		path_nameconform(fullyQualifiedPathname, nativeQualifiedPathname, PATH_STYLE_NATIVE, PATH_TYPE_ABSOLUTE);
-		LOG_DEBUG("asking Jitter object to load file \"%s\"", nativeQualifiedPathname);
+#else
+		path_nameconform(fullyQualifiedPathname, nativeQualifiedPathname, PATH_STYLE_NATIVE, PATH_TYPE_BOOT);
+#endif
+		LOG_DEBUG("nativeQualPath=%s", nativeQualifiedPathname);
 		jit_object_method(max_jit_obex_jitob_get(x), gensym("init_from_xml"), gensym(nativeQualifiedPathname), &nRetVal);
 		if (nRetVal)
 		{

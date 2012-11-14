@@ -699,13 +699,15 @@ void jit_openni_chdir(char *sOrigPath)
 }
 
 // private implementation of xnContextRunXmlScriptFromFileEx due to failures of OpenNI API to run on Osx via Max external
+// does not yet work in all cases on OSx
+/*
 XnStatus jit_openni_ContextRunXmlScriptEx(t_jit_openni *x, XnContext* pContext, const XnChar* strFileName, XnEnumerationErrors* pErrors, XnNodeHandle* phScriptNode)
 {
 	t_filehandle theFile;
 	long err, fileSize;
 	short maxPathID;
 	char *fileData = NULL;
-	char maxFileName[MAX_FILENAME_CHARS], sPathName[MAX_PATH_CHARS];
+	char maxFileName[MAX_FILENAME_CHARS];
 	XnStatus returnCode = XN_STATUS_OK;
 
 	err = (long)path_frompathname(strFileName, &maxPathID, maxFileName);
@@ -751,6 +753,7 @@ out_loadxmlbymem:
 	sysfile_close(theFile);
 	return returnCode;
 }
+*/
 
 // BUGBUG there is a crashing bug if you switch XML config files while also banging jit.openni
 void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
@@ -774,13 +777,10 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 
 	LOG_DEBUG("jit_openni_init_from_xml() about to load %s", s->s_name);
 
-#ifdef WIN_VERSION
 	jit_openni_chdir(s->s_name);
 	*nRetVal = xnContextRunXmlScriptFromFileEx(x->pContext, s->s_name, pErrors, &(x->hScriptNode));
-#else
-	// TODO try to get Windows to use this codepath, could lead to dynamic generation of XML in memory for controlling via max attributes
-	*nRetVal = jit_openni_ContextRunXmlScriptEx(x, x->pContext, s->s_name, pErrors, &(x->hScriptNode));
-#endif
+	// TODO try to get platforms to use this codepath instead of above, could lead to dynamic generation of XML in memory for controlling via max attributes
+	// *nRetVal = jit_openni_ContextRunXmlScriptEx(x, x->pContext, s->s_name, pErrors, &(x->hScriptNode));
 
 	if (*nRetVal == XN_STATUS_NO_NODE_PRESENT)
 	{

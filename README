@@ -74,6 +74,10 @@ Build notes-----------
   the 3 children of this needed directory are the three: jit-includes, max-includes,
   msp-includes.
 
+v0.8.6 yet another fix for XML config file loading
+- split method Win/OSx to resolve locaton of XML file
+- unifed API call to OpenNI for XML config file loading
+
 v0.8.5 split XML file loading methods Win/OSx
 - split the XML file loading methods Win <-> Mac OSx
 - removed some unneed nodes in the config XML file
