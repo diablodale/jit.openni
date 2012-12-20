@@ -20,8 +20,8 @@
 
 jit.openni - a Max Jitter external for OpenNI middleware
 
-Binaries/installs at https://github.com/diablodale/jit.openni/downloads
-Documentation at the wiki https://github.com/diablodale/jit.openni/wiki
+Downloads at http://hidale.com/jit-openni/#download
+Full install and usage documentation at https://github.com/diablodale/jit.openni/wiki
 
 Windows casually tested using:
 - Windows 7 64-bit Service Pack 1 (modern Win32 compatible OSs should also work)
