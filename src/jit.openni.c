@@ -244,7 +244,8 @@ t_jit_openni *jit_openni_new(void *pParent)
 void jit_openni_release_script_resources(t_jit_openni *x)
 {
 	int i;
-
+	
+	xnStopGeneratingAll(x->pContext);
 	if (x->hUserCallbacks)
 	{
 		xnUnregisterUserCallbacks(x->hProductionNode[USER_GEN_INDEX], x->hUserCallbacks);
@@ -480,6 +481,7 @@ t_jit_err jit_openni_matrix_calc(t_jit_openni *x, void *inputs, void *outputs)
 									for (iJoint = 1; iJoint <= NUM_OF_SKELETON_JOINT_TYPES; iJoint++)
 									{
 										xnGetSkeletonJoint(x->hProductionNode[USER_GEN_INDEX], x->aUserIDs[j], (XnSkeletonJoint)iJoint, &(x->pUserSkeletonJoints[j].jointTransform[iJoint]));
+										if (!xnIsJointAvailable(x->hProductionNode[USER_GEN_INDEX], (XnSkeletonJoint)iJoint)) x->pUserSkeletonJoints[j].jointTransform[iJoint].position.fConfidence = -1.0;
 										switch (x->siSkeletonValueType)
 										{
 										case 0:		 // default native OpenNI values (real world)

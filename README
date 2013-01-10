@@ -74,6 +74,10 @@ Build notes-----------
   the 3 children of this needed directory are the three: jit-includes, max-includes,
   msp-includes.
 
+v0.8.7 fix for issue# 10: orientation data not useful
+- no longer output joints if a generator doesn't support them
+- added call to stop all generators before releasing production nodes
+
 v0.8.6 yet another fix for XML config file loading
 - split method Win/OSx to resolve locaton of XML file
 - unifed API call to OpenNI for XML config file loading
