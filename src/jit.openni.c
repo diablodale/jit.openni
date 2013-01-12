@@ -1017,45 +1017,31 @@ void jit_openni_init_from_xml(t_jit_openni *x, t_symbol *s, XnStatus *nRetVal)
 // ---------- user and skeleton generator code -----------------
 
 // register to receive callbacks for jit_open object events
-t_jit_err RegisterJitOpenNIEventCallbacks(t_jit_openni *x, JitOpenNIEventHandler funcCallback, void **hUnregister)
+t_jit_err RegisterJitOpenNIEventCallbacks(t_jit_openni *x, JitOpenNIEventHandler funcCallback)
 {
-	// TODO make a critical region critical_enter() for navigating the linked list in register and unregister
-	LOG_DEBUG("starting size of linklist=%ld", jit_linklist_getsize(x->pEventCallbackFunctions));
-	if ( jit_linklist_append(x->pEventCallbackFunctions, funcCallback) == -1)		// TODO, I want to use jit_linklist_insertindex() here but it crashes on an empty list
+	if ( jit_linklist_append(x->pEventCallbackFunctions, funcCallback) == -1)
 	{
 		return JIT_ERR_OUT_OF_MEM;
-	}
-	else
-	{
-		*hUnregister = jit_linklist_index2ptr(x->pEventCallbackFunctions, jit_linklist_objptr2index(x->pEventCallbackFunctions, funcCallback));	// this is not thread safe, however, Max APIs are limiting me
-		LOG_DEBUG("added regid=%x, ending size of linklist=%ld", *hUnregister, jit_linklist_getsize(x->pEventCallbackFunctions));
 	}
 	return JIT_ERR_NONE;
 }
 
-t_jit_err UnregisterJitOpenNIEventCallbacks(t_jit_openni *x, void *pUnregister)
+t_jit_err UnregisterJitOpenNIEventCallbacks(t_jit_openni *x, JitOpenNIEventHandler funcCallback)
 {
-	LOG_DEBUG("unregister: starting size of linklist=%ld", jit_linklist_getsize(x->pEventCallbackFunctions));
-	LOG_DEBUG("unregister: About to unregister using RegID=%x", pUnregister);
-	if (jit_linklist_chuckptr(x->pEventCallbackFunctions, pUnregister) == -1)
+	if (jit_linklist_chuckindex(x->pEventCallbackFunctions, jit_linklist_objptr2index(x->pEventCallbackFunctions, funcCallback)) == -1)	// should be ok due to Max processing messages sequentially
 	{
-		LOG_DEBUG("linklist_delete returned an error");
-		LOG_DEBUG("unregister: ending size of linklist=%ld", jit_linklist_getsize(x->pEventCallbackFunctions));
 		return JIT_ERR_OUT_OF_BOUNDS;
 	}
-	else
-	{
-		LOG_DEBUG("unregister: ending size of linklist=%ld", jit_linklist_getsize(x->pEventCallbackFunctions));
-		return JIT_ERR_NONE;
-	}
+	return JIT_ERR_NONE;
 }
 
 void makeCallbacks(t_jit_openni *x, enum JitOpenNIEvents iEventType, XnUserID userID)
 {
-	long i;
+	long i, iListSize;
 	JitOpenNIEventHandler funcCallback;
 
-	for (i=0; i < jit_linklist_getsize(x->pEventCallbackFunctions); i++)	// I call for the size each loop to help catch resizing of list by another thread
+	iListSize = jit_linklist_getsize(x->pEventCallbackFunctions);
+	for (i=0; i < iListSize; i++)	// should be ok due to Max processing messages sequentially therefore size should not change during this loop
 	{
 		if (funcCallback = (JitOpenNIEventHandler)jit_linklist_getindex(x->pEventCallbackFunctions, i))
 		{

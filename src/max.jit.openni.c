@@ -158,16 +158,12 @@ void *max_jit_openni_new(t_symbol *s, long argc, t_atom *argv)
 				}
 			}
 #endif
-			if(RegisterJitOpenNIEventCallbacks((t_jit_openni *)max_jit_obex_jitob_get(x), max_jit_openni_post_events, &(x->pRegistrationForEvents)))
+			if(RegisterJitOpenNIEventCallbacks((t_jit_openni *)max_jit_obex_jitob_get(x), max_jit_openni_post_events))
 			{
 				LOG_ERROR("jit.openni: could not register for jit.openni event callbacks");
 				max_jit_openni_free(x);
 				freeobject((t_object*)x);
 				x = NULL;
-			}
-			else
-			{
-				LOG_DEBUG("jit.openni: successfully registered for jit.openni event callbacks w/ regID=%x", x->pRegistrationForEvents);
 			}
 		}
 		else
@@ -184,7 +180,7 @@ void *max_jit_openni_new(t_symbol *s, long argc, t_atom *argv)
 
 void max_jit_openni_free(t_max_jit_openni *x)
 {
-	if (UnregisterJitOpenNIEventCallbacks((t_jit_openni *)max_jit_obex_jitob_get(x), x->pRegistrationForEvents))
+	if (UnregisterJitOpenNIEventCallbacks((t_jit_openni *)max_jit_obex_jitob_get(x), max_jit_openni_post_events))
 	{
 		LOG_ERROR("jit.openni: could not unregister for jit.openni event callbacks");
 	}

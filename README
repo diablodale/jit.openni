@@ -74,6 +74,10 @@ Build notes-----------
   the 3 children of this needed directory are the three: jit-includes, max-includes,
   msp-includes.
 
+v0.8.8 removed use of an undocumented Max API
+- minor change to remove use of an undocumented Max API
+- removed some extraneous debug messages
+
 v0.8.7 fix for issue# 10: orientation data not useful
 - no longer output joints if a generator doesn't support them
 - added call to stop all generators before releasing production nodes
