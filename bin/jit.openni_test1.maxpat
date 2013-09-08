@@ -134,7 +134,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 591.0, 69.0, 406.0, 48.0 ],
-					"text" : "Download\nhttp://hidale.com/wp-content/uploads/2012/09/skeletonrec.oni\nto test using this debug config choice (no Kinect hardware needed)"
+					"text" : "Download\nhttp://s3.amazonaws.com/hidale/webcontent/openni/skeletonrec.oni\nto test using this debug config choice (no Kinect hardware needed)"
 				}
 
 			}
